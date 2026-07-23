@@ -363,11 +363,11 @@ async function main() {
     // 9. Vincular Imágenes de Actividades (mock paths)
     console.log("📸 Vinculando imágenes a actividades...");
     await db.insert(schema.activityImages).values([
-      { activityId: act1[0].id, url: "/images/act_sensorial.jpg", order: 1, isCover: true },
-      { activityId: act2[0].id, url: "/images/act_plantacion.jpg", order: 1, isCover: true },
-      { activityId: act3[0].id, url: "/images/act_basquet.jpg", order: 1, isCover: true },
-      { activityId: act4[0].id, url: "/images/act_adopcion.jpg", order: 1, isCover: true },
-      { activityId: act5[0].id, url: "/images/act_charla.jpg", order: 1, isCover: true }
+      { activityId: act1[0].id, url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop", order: 1, isCover: true },
+      { activityId: act2[0].id, url: "https://images.unsplash.com/photo-1588880331149-6ee5b299318f?q=80&w=600&auto=format&fit=crop", order: 1, isCover: true },
+      { activityId: act3[0].id, url: "https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=600&auto=format&fit=crop", order: 1, isCover: true },
+      { activityId: act4[0].id, url: "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=600&auto=format&fit=crop", order: 1, isCover: true },
+      { activityId: act5[0].id, url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop", order: 1, isCover: true }
     ]);
 
     // 10. Vincular Tags y Accesibilidad
