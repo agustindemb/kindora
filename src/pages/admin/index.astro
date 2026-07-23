@@ -2,8 +2,9 @@
 import Layout from '../../layouts/Layout.astro';
 import { db } from '../../lib/db/client';
 import { organizations, organizationStats, user, organizationLogs } from '../../lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
-import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText } from 'lucide-astro';
+import * as schema from '../../lib/db/schema';
+import { eq, and, isNull, sql, desc } from 'drizzle-orm';
+import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText, ExternalLink, Trash2, ArrowUpRight, Search, Shield, UserCheck, Eye } from 'lucide-astro';
 
 const currentUser = Astro.locals.user;
 
@@ -11,8 +12,9 @@ if (!currentUser || currentUser.role !== 'admin') {
   return Astro.redirect('/login');
 }
 
-// 1. Fetch Stats
-// We wrap in try/catch to avoid crash if no DB is connected
+// Read active tab from query params
+const activeTabParam = Astro.url.searchParams.get('tab') || 'users';
+
 let stats = {
   usersCount: 0,
   orgsCount: 0,
@@ -21,8 +23,12 @@ let stats = {
 
 let unverifiedOrgs: any[] = [];
 let pendingVerificationsList: any[] = [];
+let allUsersList: any[] = [];
+let allOrgsList: any[] = [];
+let allActivitiesList: any[] = [];
 
 try {
+  // 1. Fetch counts
   const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user);
   const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
   const actsRes = await db.select({ count: sql`count(${schema.activities.id})::int` }).from(schema.activities).where(isNull(schema.activities.deletedAt));
@@ -33,13 +39,44 @@ try {
     actsCount: actsRes[0]?.count || 0,
   };
 
-  // Fetch unverified organizations
+  // 2. Fetch full lists for inspection
+  allUsersList = await db
+    .select()
+    .from(user)
+    .orderBy(desc(user.createdAt));
+
+  allOrgsList = await db
+    .select()
+    .from(organizations)
+    .where(isNull(organizations.deletedAt))
+    .orderBy(desc(organizations.createdAt));
+
+  allActivitiesList = await db
+    .select({
+      id: schema.activities.id,
+      title: schema.activities.title,
+      slug: schema.activities.slug,
+      status: schema.activities.status,
+      startsAt: schema.activities.startsAt,
+      createdAt: schema.activities.createdAt,
+      price: schema.activities.price,
+      orgName: organizations.name,
+      orgSlug: organizations.slug,
+      categoryName: schema.categories.name,
+    })
+    .from(schema.activities)
+    .leftJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+    .leftJoin(schema.categories, eq(schema.activities.categoryId, schema.categories.id))
+    .where(isNull(schema.activities.deletedAt))
+    .orderBy(desc(schema.activities.createdAt));
+
+  // 3. Fetch unverified organizations
   unverifiedOrgs = await db
     .select()
     .from(organizations)
     .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
 
-  // Fetch logs of verification requests
+  // 4. Fetch logs of verification requests
   const logs = await db
     .select({
       log: organizationLogs,
@@ -50,7 +87,7 @@ try {
     .innerJoin(organizations, eq(organizationLogs.organizationId, organizations.id))
     .innerJoin(user, eq(organizationLogs.userId, user.id))
     .where(eq(organizationLogs.action, 'verification_requested'))
-    .orderBy(organizationLogs.createdAt);
+    .orderBy(desc(organizationLogs.createdAt));
 
   pendingVerificationsList = logs.map(l => {
     let details = { dni: '', phone: '', notes: '' };
@@ -66,16 +103,34 @@ try {
     };
   });
 } catch(e) {
-  console.warn("DB not connected, using fallback mocks for admin.");
-  const { mockOrganizations } = await import('../../lib/db/mocks');
+  console.warn("DB query error or fallback mock used for admin:", e);
+  const { mockOrganizations, mockActivities } = await import('../../lib/db/mocks');
   unverifiedOrgs = mockOrganizations.filter(o => o.verificationLevel === 'none');
   stats = {
     usersCount: 3,
     orgsCount: mockOrganizations.length,
-    actsCount: 5,
+    actsCount: mockActivities.length,
   };
   
-  // mock verification request
+  allUsersList = [
+    { id: 'usr_admin', name: 'Admin Kindora', email: 'agustin@proasc.com', role: 'admin', createdAt: new Date() },
+    { id: 'usr_org', name: 'María Gómez', email: 'organizador@kindora.com', role: 'organizer', createdAt: new Date() },
+    { id: 'usr_part', name: 'Juan Pérez', email: 'participante@kindora.com', role: 'participant', createdAt: new Date() }
+  ];
+  allOrgsList = mockOrganizations;
+  allActivitiesList = mockActivities.map(a => ({
+    id: a.id,
+    title: a.title,
+    slug: a.slug,
+    status: a.status,
+    startsAt: a.startsAt,
+    createdAt: a.createdAt,
+    price: a.price,
+    orgName: 'Organización Kindora',
+    orgSlug: 'org-kindora',
+    categoryName: 'General'
+  }));
+
   pendingVerificationsList = [
     {
       id: 'mock-req-1',
@@ -89,7 +144,7 @@ try {
   ];
 }
 
-// Handle POST actions: Approve/Reject Verification requests
+// Handle POST actions: Approve/Reject Verification requests & Moderation
 let successMsg = '';
 let errorMsg = '';
 
@@ -97,24 +152,21 @@ if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
     const action = formData.get('action');
-    const orgId = formData.get('organizationId') as string;
 
     if (action === 'approve') {
+      const orgId = formData.get('organizationId') as string;
       const level = formData.get('level') as string || 'verified';
       
-      // Update organization verification in DB
       await db.update(organizations).set({
         verificationLevel: level,
         verifiedAt: new Date(),
         verifiedBy: currentUser.id
       }).where(eq(organizations.id, orgId));
 
-      // Also approve all activities from this organization that are in 'pending_review' -> make them 'published'
       await db.update(schema.activities).set({
         status: 'published'
       }).where(and(eq(schema.activities.organizationId, orgId), eq(schema.activities.status, 'pending_review')));
 
-      // Log action
       await db.insert(schema.organizationLogs).values({
         organizationId: orgId,
         userId: currentUser.id,
@@ -123,12 +175,10 @@ if (Astro.request.method === 'POST') {
       });
 
       successMsg = `Organización aprobada con nivel: ${level.toUpperCase()}. Sus actividades pendientes han sido publicadas.`;
-
-      // Refresh
-      return Astro.redirect('/admin');
+      return Astro.redirect('/admin?tab=verifications');
 
     } else if (action === 'reject') {
-      // Remove verification requested logs
+      const orgId = formData.get('organizationId') as string;
       await db.delete(organizationLogs).where(
         and(
           eq(organizationLogs.organizationId, orgId),
@@ -137,79 +187,435 @@ if (Astro.request.method === 'POST') {
       );
       
       successMsg = 'Solicitud de verificación rechazada.';
-      return Astro.redirect('/admin');
+      return Astro.redirect('/admin?tab=verifications');
+
+    } else if (action === 'update_user_role') {
+      const targetUserId = formData.get('userId') as string;
+      const newRole = formData.get('role') as string;
+      
+      await db.update(user).set({
+        role: newRole,
+        updatedAt: new Date()
+      }).where(eq(user.id, targetUserId));
+
+      successMsg = `Rol de usuario actualizado correctamente a ${newRole.toUpperCase()}.`;
+      return Astro.redirect('/admin?tab=users');
+
+    } else if (action === 'delete_activity') {
+      const actId = formData.get('activityId') as string;
+      await db.update(schema.activities).set({
+        deletedAt: new Date()
+      }).where(eq(schema.activities.id, actId));
+
+      successMsg = 'Actividad eliminada correctamente.';
+      return Astro.redirect('/admin?tab=activities');
     }
   } catch (err: any) {
     errorMsg = err.message || 'Error al procesar la solicitud.';
   }
 }
-
-import * as schema from '../../lib/db/schema';
-import { sql } from 'drizzle-orm';
 ---
 
 <Layout title="Panel Administrador | Kindora">
-  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
     
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-6 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-6">
       <div>
-        <h1 class="text-3xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
+        <h1 class="text-3xl font-black tracking-tight text-zinc-950 flex items-center gap-2.5">
           <ShieldCheck class="h-8 w-8 text-purple-600" />
           Panel Administrador
         </h1>
-        <p class="text-sm text-zinc-500 mt-1">Monitoreá la plataforma, verificá organizaciones y moderá contenido.</p>
+        <p class="text-sm text-zinc-500 mt-1">Monitoreá la plataforma, verificá organizaciones y gestioná usuarios y contenidos en tiempo real.</p>
       </div>
-      <div class="text-xs font-semibold text-zinc-400 bg-zinc-100 px-3 py-1.5 rounded-xl self-start">
-        Modo de simulación activa (Admin)
-      </div>
-    </div>
-
-    <!-- Stats widgets -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
-        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
-          <Users class="h-6 w-6" />
+      <div class="flex items-center gap-2 self-start md:self-auto">
+        <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+          <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Conectado como Superadmin
         </span>
-        <div>
-          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Usuarios totales</span>
-          <span class="text-2xl font-black text-zinc-950 block">{stats.usersCount}</span>
-        </div>
-      </div>
-      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
-        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
-          <Building2 class="h-6 w-6" />
-        </span>
-        <div>
-          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Organizaciones</span>
-          <span class="text-2xl font-black text-zinc-950 block">{stats.orgsCount}</span>
-        </div>
-      </div>
-      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
-        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
-          <Calendar class="h-6 w-6" />
-        </span>
-        <div>
-          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Actividades creadas</span>
-          <span class="text-2xl font-black text-zinc-950 block">{stats.actsCount}</span>
-        </div>
       </div>
     </div>
 
     {successMsg && (
-      <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800 font-semibold mb-6 shadow-sm">
+      <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 font-semibold shadow-sm flex items-center gap-2">
+        <CheckCircle2 class="h-5 w-5 text-emerald-600 flex-shrink-0" />
         {successMsg}
       </div>
     )}
     {errorMsg && (
-      <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold mb-6 shadow-sm">
+      <div class="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-700 font-semibold shadow-sm flex items-center gap-2">
+        <XCircle class="h-5 w-5 text-rose-600 flex-shrink-0" />
         {errorMsg}
       </div>
     )}
 
-    <!-- Verification Requests list -->
-    <div class="space-y-6">
-      <h2 class="text-xl font-bold text-zinc-950">Solicitudes de verificación pendientes ({pendingVerificationsList.length})</h2>
+    <!-- Interactive Stat Cards (Click to Inspect) -->
+    <div>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Métricas e Inspección Rápida</h2>
+        <span class="text-xs text-purple-600 font-medium">Hacé click en cualquier tarjeta para ver su listado completo</span>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- 1. Card Usuarios -->
+        <button 
+          type="button" 
+          id="btn-tab-users"
+          class="tab-trigger w-full text-left rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group relative overflow-hidden"
+          data-target="users"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <Users class="h-6 w-6" />
+              </span>
+              <div>
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Usuarios Totales</span>
+                <span class="text-3xl font-black text-zinc-950 block">{stats.usersCount}</span>
+              </div>
+            </div>
+            <ArrowUpRight class="h-5 w-5 text-zinc-300 group-hover:text-purple-600 transition-colors" />
+          </div>
+          <div class="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs text-purple-700 font-semibold">
+            <span>Inspeccionar usuarios</span>
+            <span class="text-[10px] bg-purple-50 px-2 py-0.5 rounded-md">Ver listado &rarr;</span>
+          </div>
+        </button>
+
+        <!-- 2. Card Organizaciones -->
+        <button 
+          type="button" 
+          id="btn-tab-orgs"
+          class="tab-trigger w-full text-left rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer group relative overflow-hidden"
+          data-target="orgs"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <Building2 class="h-6 w-6" />
+              </span>
+              <div>
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Organizaciones</span>
+                <span class="text-3xl font-black text-zinc-950 block">{stats.orgsCount}</span>
+              </div>
+            </div>
+            <ArrowUpRight class="h-5 w-5 text-zinc-300 group-hover:text-emerald-600 transition-colors" />
+          </div>
+          <div class="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs text-emerald-700 font-semibold">
+            <span>Inspeccionar entidades</span>
+            <span class="text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md">Ver listado &rarr;</span>
+          </div>
+        </button>
+
+        <!-- 3. Card Actividades -->
+        <button 
+          type="button" 
+          id="btn-tab-activities"
+          class="tab-trigger w-full text-left rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group relative overflow-hidden"
+          data-target="activities"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <Calendar class="h-6 w-6" />
+              </span>
+              <div>
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Actividades Creadas</span>
+                <span class="text-3xl font-black text-zinc-950 block">{stats.actsCount}</span>
+              </div>
+            </div>
+            <ArrowUpRight class="h-5 w-5 text-zinc-300 group-hover:text-blue-600 transition-colors" />
+          </div>
+          <div class="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs text-blue-700 font-semibold">
+            <span>Inspeccionar publicaciones</span>
+            <span class="text-[10px] bg-blue-50 px-2 py-0.5 rounded-md">Ver listado &rarr;</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs Bar -->
+    <div class="border-b border-zinc-200 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <button 
+        type="button" 
+        data-target="users"
+        class="tab-btn px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer border-transparent text-zinc-500 hover:text-zinc-900"
+      >
+        <Users class="h-4 w-4" />
+        Usuarios ({allUsersList.length})
+      </button>
+      <button 
+        type="button" 
+        data-target="orgs"
+        class="tab-btn px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer border-transparent text-zinc-500 hover:text-zinc-900"
+      >
+        <Building2 class="h-4 w-4" />
+        Organizaciones ({allOrgsList.length})
+      </button>
+      <button 
+        type="button" 
+        data-target="activities"
+        class="tab-btn px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer border-transparent text-zinc-500 hover:text-zinc-900"
+      >
+        <Calendar class="h-4 w-4" />
+        Actividades ({allActivitiesList.length})
+      </button>
+      <button 
+        type="button" 
+        data-target="verifications"
+        class="tab-btn px-4 py-2.5 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer border-transparent text-zinc-500 hover:text-zinc-900"
+      >
+        <ShieldCheck class="h-4 w-4" />
+        Solicitudes de Verificación ({pendingVerificationsList.length})
+      </button>
+    </div>
+
+    <!-- TAB 1: LISTADO DE USUARIOS -->
+    <div id="panel-users" class="tab-panel space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-zinc-950 flex items-center gap-2">
+          <Users class="h-5 w-5 text-purple-600" />
+          Listado Completo de Usuarios Registrados
+        </h2>
+        <span class="text-xs text-zinc-400 font-medium">Total: {allUsersList.length} usuarios</span>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+            <tr>
+              <th class="px-6 py-4">Usuario</th>
+              <th class="px-6 py-4">Email</th>
+              <th class="px-6 py-4">Rol</th>
+              <th class="px-6 py-4">Teléfono</th>
+              <th class="px-6 py-4">Fecha Registro</th>
+              <th class="px-6 py-4 text-right">Cambiar Rol</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 font-medium text-zinc-700">
+            {allUsersList.map((u) => (
+              <tr class="hover:bg-zinc-50/50 transition-colors">
+                <td class="px-6 py-4 flex items-center gap-3">
+                  <div class="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex-shrink-0">
+                    {u.name ? u.name.substring(0, 2).toUpperCase() : 'US'}
+                  </div>
+                  <div>
+                    <span class="block font-bold text-zinc-900">{u.name}</span>
+                    <span class="block text-[11px] text-zinc-400 font-mono">ID: {u.id}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-zinc-600">{u.email}</td>
+                <td class="px-6 py-4">
+                  {u.role === 'admin' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800">
+                      <Shield class="h-3.5 w-3.5" />
+                      ADMIN
+                    </span>
+                  )}
+                  {u.role === 'organizer' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                      <Building2 class="h-3.5 w-3.5" />
+                      ORGANIZADOR
+                    </span>
+                  )}
+                  {u.role === 'participant' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-bold text-zinc-600">
+                      <Users class="h-3.5 w-3.5" />
+                      PARTICIPANTE
+                    </span>
+                  )}
+                </td>
+                <td class="px-6 py-4 text-xs text-zinc-500">{u.phone || 'No registrado'}</td>
+                <td class="px-6 py-4 text-xs text-zinc-500">{u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-AR') : 'Reciente'}</td>
+                <td class="px-6 py-4 text-right">
+                  <form method="POST" class="m-0 inline-flex items-center gap-1">
+                    <input type="hidden" name="action" value="update_user_role" />
+                    <input type="hidden" name="userId" value={u.id} />
+                    <select name="role" class="rounded-xl border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold focus:outline-none shadow-sm">
+                      <option value="participant" selected={u.role === 'participant'}>Participante</option>
+                      <option value="organizer" selected={u.role === 'organizer'}>Organizador</option>
+                      <option value="admin" selected={u.role === 'admin'}>Admin</option>
+                    </select>
+                    <button type="submit" class="rounded-xl bg-zinc-900 hover:bg-zinc-800 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all">
+                      Guardar
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: LISTADO DE ORGANIZACIONES -->
+    <div id="panel-orgs" class="tab-panel space-y-4 hidden">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-zinc-950 flex items-center gap-2">
+          <Building2 class="h-5 w-5 text-emerald-600" />
+          Listado Completo de Organizaciones Registradas
+        </h2>
+        <span class="text-xs text-zinc-400 font-medium">Total: {allOrgsList.length} organizaciones</span>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+            <tr>
+              <th class="px-6 py-4">Organización</th>
+              <th class="px-6 py-4">Tipo</th>
+              <th class="px-6 py-4">Contacto</th>
+              <th class="px-6 py-4">Nivel Verificación</th>
+              <th class="px-6 py-4 text-right">Ver Pública</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 font-medium text-zinc-700">
+            {allOrgsList.map((o) => (
+              <tr class="hover:bg-zinc-50/50 transition-colors">
+                <td class="px-6 py-4 flex items-center gap-3">
+                  <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 font-bold text-sm flex-shrink-0">
+                    {o.name ? o.name.substring(0, 2).toUpperCase() : 'OG'}
+                  </div>
+                  <div>
+                    <span class="block font-bold text-zinc-900">{o.name}</span>
+                    <span class="block text-[11px] text-zinc-400">/{o.slug}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-xs font-semibold text-zinc-600">{o.type || 'ONG'}</td>
+                <td class="px-6 py-4 text-xs text-zinc-500">
+                  <span class="block font-semibold text-zinc-800">{o.contactPerson || o.email}</span>
+                  {o.phone && <span class="block text-[11px] text-zinc-400">{o.phone}</span>}
+                </td>
+                <td class="px-6 py-4">
+                  {o.verificationLevel === 'official' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">
+                      <CheckCircle2 class="h-3.5 w-3.5" /> Official
+                    </span>
+                  )}
+                  {o.verificationLevel === 'foundation' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800">
+                      <CheckCircle2 class="h-3.5 w-3.5" /> Foundation
+                    </span>
+                  )}
+                  {o.verificationLevel === 'verified' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                      <CheckCircle2 class="h-3.5 w-3.5" /> Verified
+                    </span>
+                  )}
+                  {o.verificationLevel === 'none' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-200">
+                      Sin verificar
+                    </span>
+                  )}
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <a 
+                    href={`/organizacion/${o.slug}`} 
+                    target="_blank" 
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-3 py-1.5 text-xs font-bold text-zinc-700 transition-all shadow-sm"
+                  >
+                    Ver Ficha
+                    <ExternalLink class="h-3.5 w-3.5 text-zinc-400" />
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: LISTADO DE ACTIVIDADES -->
+    <div id="panel-activities" class="tab-panel space-y-4 hidden">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-zinc-950 flex items-center gap-2">
+          <Calendar class="h-5 w-5 text-blue-600" />
+          Listado Completo de Actividades Creadas
+        </h2>
+        <span class="text-xs text-zinc-400 font-medium">Total: {allActivitiesList.length} actividades</span>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100">
+            <tr>
+              <th class="px-6 py-4">Actividad</th>
+              <th class="px-6 py-4">Organización</th>
+              <th class="px-6 py-4">Categoría</th>
+              <th class="px-6 py-4">Estado</th>
+              <th class="px-6 py-4">Fecha Evento</th>
+              <th class="px-6 py-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 font-medium text-zinc-700">
+            {allActivitiesList.map((a) => (
+              <tr class="hover:bg-zinc-50/50 transition-colors">
+                <td class="px-6 py-4 font-bold text-zinc-900 max-w-xs truncate">
+                  {a.title}
+                </td>
+                <td class="px-6 py-4 text-xs font-semibold text-zinc-600">
+                  {a.orgName || 'Organización Kindora'}
+                </td>
+                <td class="px-6 py-4 text-xs font-medium text-zinc-500">
+                  {a.categoryName || 'General'}
+                </td>
+                <td class="px-6 py-4">
+                  {a.status === 'published' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                      Publicada
+                    </span>
+                  )}
+                  {a.status === 'pending_review' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                      Pendiente Moderación
+                    </span>
+                  )}
+                  {a.status === 'draft' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-bold text-zinc-600">
+                      Borrador
+                    </span>
+                  )}
+                  {a.status === 'completed' && (
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">
+                      Finalizada
+                    </span>
+                  )}
+                </td>
+                <td class="px-6 py-4 text-xs text-zinc-500">
+                  {a.startsAt ? new Date(a.startsAt).toLocaleDateString('es-AR') : 'Próxima'}
+                </td>
+                <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
+                  <a 
+                    href={`/actividad/${a.slug}`} 
+                    target="_blank" 
+                    class="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition-all shadow-sm"
+                  >
+                    <Eye class="h-3.5 w-3.5 text-zinc-400" />
+                    Ver
+                  </a>
+
+                  <!-- Delete Action -->
+                  <form method="POST" class="m-0" onsubmit="return confirm('¿Seguro que deseas eliminar esta actividad?');">
+                    <input type="hidden" name="action" value="delete_activity" />
+                    <input type="hidden" name="activityId" value={a.id} />
+                    <button type="submit" class="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 text-xs font-bold text-rose-700 transition-all">
+                      <Trash2 class="h-3.5 w-3.5" />
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: SOLICITUDES DE VERIFICACIÓN PENDIENTES -->
+    <div id="panel-verifications" class="tab-panel space-y-4 hidden">
+      <h2 class="text-xl font-bold text-zinc-950 flex items-center gap-2">
+        <ShieldCheck class="h-5 w-5 text-purple-600" />
+        Solicitudes de verificación pendientes ({pendingVerificationsList.length})
+      </h2>
 
       {pendingVerificationsList.length === 0 ? (
         <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay solicitudes de verificación pendientes por el momento.</p>
@@ -257,7 +663,7 @@ import { sql } from 'drizzle-orm';
                 </div>
               </div>
 
-              <!-- Request details details -->
+              <!-- Request details -->
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <div>
                   <span class="block font-bold text-zinc-400 uppercase tracking-wider">DNI Responsable</span>
@@ -280,3 +686,55 @@ import { sql } from 'drizzle-orm';
 
   </div>
 </Layout>
+
+<script is:inline define:vars={{ activeTabParam }}>
+  document.addEventListener('DOMContentLoaded', () => {
+    const tabTriggers = document.querySelectorAll('.tab-trigger, .tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    function switchTab(targetId) {
+      tabPanels.forEach(panel => {
+        if (panel.id === `panel-${targetId}`) {
+          panel.classList.remove('hidden');
+        } else {
+          panel.classList.add('hidden');
+        }
+      });
+
+      // Update tab buttons active styles
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-target') === targetId) {
+          btn.classList.add('border-purple-600', 'text-purple-600');
+          btn.classList.remove('border-transparent', 'text-zinc-500');
+        } else {
+          btn.classList.remove('border-purple-600', 'text-purple-600');
+          btn.classList.add('border-transparent', 'text-zinc-500');
+        }
+      });
+
+      // Update stat cards active style
+      document.querySelectorAll('.tab-trigger').forEach(card => {
+        if (card.getAttribute('data-target') === targetId) {
+          card.classList.add('ring-2', 'ring-purple-600', 'ring-offset-2');
+        } else {
+          card.classList.remove('ring-2', 'ring-purple-600', 'ring-offset-2');
+        }
+      });
+    }
+
+    tabTriggers.forEach(trigger => {
+      trigger.addEventListener('click', () => {
+        const target = trigger.getAttribute('data-target');
+        switchTab(target);
+        // Optionally update URL without reload
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('tab', target);
+        window.history.pushState({}, '', newUrl);
+      });
+    });
+
+    // Initial tab setup
+    const initialTarget = activeTabParam || 'users';
+    switchTab(initialTarget);
+  });
+</script>
