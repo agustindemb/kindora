@@ -2,6 +2,12 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/client";
 import { magicLink } from "better-auth/plugins";
+import { user as userTable } from "../db/schema";
+import { eq } from "drizzle-orm";
+
+const ADMIN_DOMAIN = "@proasc.com";
+
+const isAdminEmail = (email: string) => email.toLowerCase().endsWith(ADMIN_DOMAIN);
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -24,6 +30,46 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (userData) => {
+          // Auto-elevate @proasc.com accounts to admin on registration
+          if (isAdminEmail(userData.email)) {
+            console.log(`[Auth] Auto-elevating ${userData.email} to admin (proasc.com domain)`);
+            return { data: { ...userData, role: "admin" } };
+          }
+          return { data: userData };
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (sessionData) => {
+          // On every new session, verify the user's role is still correct
+          // This handles the case where an existing user's role needs to be updated
+          try {
+            const [existingUser] = await db
+              .select()
+              .from(userTable)
+              .where(eq(userTable.id, sessionData.userId))
+              .limit(1);
+
+            if (existingUser && isAdminEmail(existingUser.email) && existingUser.role !== "admin") {
+              console.log(`[Auth] Upgrading existing user ${existingUser.email} to admin on login`);
+              await db
+                .update(userTable)
+                .set({ role: "admin", updatedAt: new Date() })
+                .where(eq(userTable.id, existingUser.id));
+            }
+          } catch (e) {
+            console.error("[Auth] Error checking user role on session create:", e);
+          }
+          return { data: sessionData };
+        },
+      },
+    },
   },
   plugins: [
     magicLink({
