@@ -78,7 +78,7 @@ if (Astro.request.method === 'POST') {
         await auth.api.signInMagicLink({
           body: {
             email: emailVal,
-            callbackURL: '/dashboard/participante',
+            callbackURL: Astro.url.origin + '/dashboard/participante',
           },
           headers: Astro.request.headers,
         });
