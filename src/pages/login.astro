@@ -72,17 +72,20 @@ if (Astro.request.method === 'POST') {
       if (!emailVal) {
         errorMessage = 'Por favor ingresá un correo válido.';
       } else {
-        // Trigger Better Auth native magic link sending flow
+        // Detect role by email domain — @proasc.com gets sent to /admin
+        const baseUrl = process.env.BETTER_AUTH_URL || Astro.url.origin;
+        const isAdminEmail = emailVal.toLowerCase().endsWith('@proasc.com');
+        const callbackPath = isAdminEmail ? '/admin' : '/dashboard/participante';
+
         const { auth } = await import('../lib/auth/auth');
-        // We pass the raw request and URL context to Better Auth
         await auth.api.signInMagicLink({
           body: {
             email: emailVal,
-            callbackURL: (process.env.BETTER_AUTH_URL || Astro.url.origin) + '/dashboard/participante',
+            callbackURL: baseUrl + callbackPath,
           },
           headers: Astro.request.headers,
         });
-        successMessage = '¡Enlace enviado! Buscá en la consola de tu terminal de desarrollo el enlace para iniciar sesión.';
+        successMessage = '¡Enlace enviado! Revisá tu correo para iniciar sesión.';
       }
     }
   } catch (err: any) {
