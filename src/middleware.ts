@@ -1,5 +1,10 @@
 import { auth } from "./lib/auth/auth";
 import { defineMiddleware } from "astro:middleware";
+import { db } from "./lib/db/client";
+import { user as userTable } from "./lib/db/schema";
+import { eq } from "drizzle-orm";
+
+const ADMIN_DOMAIN = "@proasc.com";
 
 export const onRequest = defineMiddleware(async (context, next) => {
   try {
@@ -7,9 +12,32 @@ export const onRequest = defineMiddleware(async (context, next) => {
       headers: context.request.headers,
     });
 
-    if (session) {
-      context.locals.user = session.user;
-      context.locals.session = session.session;
+    if (session?.user?.id) {
+      // Always fetch fresh user data from DB — never trust the session cache for roles
+      const [freshUser] = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.id, session.user.id))
+        .limit(1);
+
+      if (freshUser) {
+        // Auto-elevate @proasc.com accounts to admin if not already
+        if (freshUser.email.toLowerCase().endsWith(ADMIN_DOMAIN) && freshUser.role !== "admin") {
+          console.log(`[Middleware] Auto-elevating ${freshUser.email} to admin`);
+          await db
+            .update(userTable)
+            .set({ role: "admin", updatedAt: new Date() })
+            .where(eq(userTable.id, freshUser.id));
+          freshUser.role = "admin";
+        }
+
+        // Merge fresh DB data into the session user so pages always see current role
+        context.locals.user = { ...session.user, ...freshUser };
+        context.locals.session = session.session;
+      } else {
+        context.locals.user = null;
+        context.locals.session = null;
+      }
     } else {
       context.locals.user = null;
       context.locals.session = null;

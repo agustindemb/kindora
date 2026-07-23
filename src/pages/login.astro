@@ -72,16 +72,12 @@ if (Astro.request.method === 'POST') {
       if (!emailVal) {
         errorMessage = 'Por favor ingresá un correo válido.';
       } else {
-        // Detect role by email domain — @proasc.com gets sent to /admin
         const baseUrl = process.env.BETTER_AUTH_URL || Astro.url.origin;
-        const isAdminEmail = emailVal.toLowerCase().endsWith('@proasc.com');
-        const callbackPath = isAdminEmail ? '/admin' : '/dashboard/participante';
-
         const { auth } = await import('../lib/auth/auth');
         await auth.api.signInMagicLink({
           body: {
             email: emailVal,
-            callbackURL: baseUrl + callbackPath,
+            callbackURL: baseUrl + '/dashboard',
           },
           headers: Astro.request.headers,
         });
