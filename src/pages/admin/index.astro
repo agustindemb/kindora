@@ -209,6 +209,28 @@ if (Astro.request.method === 'POST') {
 
       successMsg = 'Actividad eliminada correctamente.';
       return Astro.redirect('/admin?tab=activities');
+
+    } else if (action === 'delete_user') {
+      const targetUserId = formData.get('userId') as string;
+      if (targetUserId === currentUser.id) {
+        throw new Error('No podés eliminar tu propia cuenta de administrador.');
+      }
+      await db.update(user).set({
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      }).where(eq(user.id, targetUserId));
+
+      successMsg = 'Usuario eliminado correctamente.';
+      return Astro.redirect('/admin?tab=users');
+
+    } else if (action === 'delete_organization') {
+      const orgId = formData.get('organizationId') as string;
+      await db.update(organizations).set({
+        deletedAt: new Date()
+      }).where(eq(organizations.id, orgId));
+
+      successMsg = 'Organización eliminada correctamente.';
+      return Astro.redirect('/admin?tab=orgs');
     }
   } catch (err: any) {
     errorMsg = err.message || 'Error al procesar la solicitud.';
@@ -427,7 +449,7 @@ if (Astro.request.method === 'POST') {
                 </td>
                 <td class="px-6 py-4 text-xs text-zinc-500">{u.phone || 'No registrado'}</td>
                 <td class="px-6 py-4 text-xs text-zinc-500">{u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-AR') : 'Reciente'}</td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
                   <form method="POST" class="m-0 inline-flex items-center gap-1">
                     <input type="hidden" name="action" value="update_user_role" />
                     <input type="hidden" name="userId" value={u.id} />
@@ -440,6 +462,16 @@ if (Astro.request.method === 'POST') {
                       Guardar
                     </button>
                   </form>
+
+                  {u.id !== currentUser.id && (
+                    <form method="POST" class="m-0 inline-flex" onsubmit="return confirm('¿Seguro que deseas eliminar este usuario?');">
+                      <input type="hidden" name="action" value="delete_user" />
+                      <input type="hidden" name="userId" value={u.id} />
+                      <button type="submit" class="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 p-1.5 text-xs font-bold text-rose-700 transition-all" title="Eliminar usuario">
+                        <Trash2 class="h-3.5 w-3.5" />
+                      </button>
+                    </form>
+                  )}
                 </td>
               </tr>
             ))}
@@ -508,7 +540,7 @@ if (Astro.request.method === 'POST') {
                     </span>
                   )}
                 </td>
-                <td class="px-6 py-4 text-right">
+                <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
                   <a 
                     href={`/organizacion/${o.slug}`} 
                     target="_blank" 
@@ -517,6 +549,14 @@ if (Astro.request.method === 'POST') {
                     Ver Ficha
                     <ExternalLink class="h-3.5 w-3.5 text-zinc-400" />
                   </a>
+
+                  <form method="POST" class="m-0 inline-flex" onsubmit="return confirm('¿Seguro que deseas eliminar esta organización?');">
+                    <input type="hidden" name="action" value="delete_organization" />
+                    <input type="hidden" name="organizationId" value={o.id} />
+                    <button type="submit" class="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 p-1.5 text-xs font-bold text-rose-700 transition-all" title="Eliminar organización">
+                      <Trash2 class="h-3.5 w-3.5" />
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}
