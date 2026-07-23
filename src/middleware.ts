@@ -31,8 +31,26 @@ export const onRequest = defineMiddleware(async (context, next) => {
           freshUser.role = "admin";
         }
 
-        // Merge fresh DB data into the session user so pages always see current role
-        context.locals.user = { ...session.user, ...freshUser };
+        // Support Admin Role Impersonation (View Mode)
+        const realRole = freshUser.role;
+        const impersonateCookie = context.cookies.get("impersonate_role")?.value;
+        
+        let activeRole = realRole;
+        let isImpersonating = false;
+
+        if (realRole === "admin" && impersonateCookie && ["organizer", "participant"].includes(impersonateCookie)) {
+          activeRole = impersonateCookie;
+          isImpersonating = true;
+        }
+
+        // Merge fresh DB data into the session user so pages see current role
+        context.locals.user = { 
+          ...session.user, 
+          ...freshUser, 
+          role: activeRole,
+          realRole: realRole,
+          isImpersonating: isImpersonating
+        };
         context.locals.session = session.session;
       } else {
         context.locals.user = null;

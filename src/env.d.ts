@@ -10,6 +10,8 @@ declare namespace App {
       image?: string | null;
       phone?: string | null;
       role: string;
+      realRole?: string;
+      isImpersonating?: boolean;
       createdAt: Date;
       updatedAt: Date;
     } | null;

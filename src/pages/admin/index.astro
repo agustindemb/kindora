@@ -8,7 +8,7 @@ import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileTex
 
 const currentUser = Astro.locals.user;
 
-if (!currentUser || currentUser.role !== 'admin') {
+if (!currentUser || (currentUser.role !== 'admin' && currentUser.realRole !== 'admin')) {
   return Astro.redirect('/login');
 }
 
