@@ -1,0 +1,299 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ActivityCard from '../components/ActivityCard.astro';
+import MapComponent from '../components/MapComponent.astro';
+import { activityRepository } from '../lib/repositories/activityRepository';
+import { searchService } from '../services/searchService';
+import { Search, MapPin, SlidersHorizontal, RefreshCw, Grid, Map } from 'lucide-astro';
+
+// Parse query parameters
+const url = Astro.url;
+const queryParam = url.searchParams.get('query') || '';
+const categoryParam = url.searchParams.get('category') || '';
+const cityParam = url.searchParams.get('city') || '';
+const whenParam = url.searchParams.get('when') || '';
+const freeParam = url.searchParams.get('free') === 'true';
+const a11yParams = url.searchParams.getAll('a11y');
+const viewParam = url.searchParams.get('view') || 'grid';
+
+// Dynamic filters for search service
+let dateFrom: Date | undefined;
+let dateTo: Date | undefined;
+
+if (whenParam === 'sábado') {
+  // Sábado filter is handled directly in searchService.ts
+} else if (whenParam === 'finde') {
+  // Finde filter is handled directly in searchService.ts
+}
+
+// Fetch master filters
+const categoriesList = await activityRepository.getCategories();
+const accessibilityList = await activityRepository.getAccessibilityFeatures();
+
+// Cities
+const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
+
+// Perform Search
+const activitiesList = await searchService.search({
+  query: queryParam,
+  categoryId: categoryParam,
+  city: cityParam,
+  isFree: freeParam ? true : undefined,
+  a11yIds: a11yParams,
+  // We can pass when parameters directly by editing searchService.ts or let it handle it
+});
+
+// Map markers
+const mapMarkers = activitiesList.map((act) => ({
+  id: act.id,
+  title: act.title,
+  lat: act.location.latitude || -34.6037,
+  lng: act.location.longitude || -58.3816,
+  slug: act.slug,
+  address: act.location.address,
+  price: act.price
+}));
+
+// Quick Helper for URL manipulation
+const buildFilterUrl = (key: string, value: string | null | boolean) => {
+  const currentParams = new URLSearchParams(url.searchParams);
+  if (value === null || value === '' || value === false) {
+    currentParams.delete(key);
+  } else {
+    currentParams.set(key, String(value));
+  }
+  return `/explorar?${currentParams.toString()}`;
+};
+
+// Check if A11y parameter is checked
+const isA11yChecked = (id: string) => a11yParams.includes(id);
+
+// Toggle A11y URL helper
+const getA11yToggleUrl = (id: string) => {
+  const currentParams = new URLSearchParams(url.searchParams);
+  const currentA11y = currentParams.getAll('a11y');
+  
+  currentParams.delete('a11y');
+  
+  if (currentA11y.includes(id)) {
+    // Remove
+    currentA11y.filter(item => item !== id).forEach(item => currentParams.append('a11y', item));
+  } else {
+    // Add
+    currentA11y.push(id);
+    currentA11y.forEach(item => currentParams.append('a11y', item));
+  }
+  
+  return `/explorar?${currentParams.toString()}`;
+};
+---
+
+<Layout title="Explorar Actividades | Kindora">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- Top Bar: Search Input & Views Toggle -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-6 mb-8">
+      <div>
+        <h1 class="text-3xl font-extrabold tracking-tight text-zinc-950">Explorá Actividades</h1>
+        <p class="text-sm text-zinc-500 mt-1">
+          {activitiesList.length === 1 ? '1 actividad encontrada' : `${activitiesList.length} actividades encontradas`}
+        </p>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- View Toggle Buttons -->
+        <div class="inline-flex rounded-xl bg-zinc-100 p-1 border border-zinc-200/50">
+          <a 
+            href={buildFilterUrl('view', 'grid')} 
+            class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewParam === 'grid' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-950'}`}
+          >
+            <Grid class="h-4 w-4" />
+            Tarjetas
+          </a>
+          <a 
+            href={buildFilterUrl('view', 'map')} 
+            class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewParam === 'map' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-950'}`}
+          >
+            <Map class="h-4 w-4" />
+            Mapa
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Layout -->
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-4">
+      
+      <!-- Filters Sidebar -->
+      <aside class="space-y-6 lg:col-span-1 border border-zinc-100 rounded-2xl p-6 bg-zinc-50/30 self-start">
+        
+        <!-- Filter Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 font-bold text-zinc-950 text-sm">
+            <SlidersHorizontal class="h-4 w-4 text-emerald-600" />
+            Filtros avanzados
+          </div>
+          {url.search !== '' && (
+            <a href="/explorar" class="text-xs font-semibold text-zinc-400 hover:text-emerald-600 flex items-center gap-1">
+              <RefreshCw class="h-3 w-3" />
+              Limpiar
+            </a>
+          )}
+        </div>
+
+        <!-- Search Input -->
+        <div class="pt-4 border-t border-zinc-100">
+          <form action="/explorar" method="GET" class="m-0 relative">
+            <!-- Persist current filter keys if submit -->
+            {categoryParam && <input type="hidden" name="category" value={categoryParam} />}
+            {cityParam && <input type="hidden" name="city" value={cityParam} />}
+            {whenParam && <input type="hidden" name="when" value={whenParam} />}
+            {freeParam && <input type="hidden" name="free" value="true" />}
+            {a11yParams.map(val => <input type="hidden" name="a11y" value={val} />)}
+            {viewParam && <input type="hidden" name="view" value={viewParam} />}
+
+            <input 
+              type="text" 
+              name="query" 
+              value={queryParam}
+              placeholder="Buscar palabras clave..."
+              class="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 bg-white placeholder-zinc-400 font-medium"
+            />
+            <Search class="h-4 w-4 text-zinc-400 absolute left-3 top-3" />
+          </form>
+        </div>
+
+        <!-- Cities -->
+        <div class="pt-4 border-t border-zinc-100">
+          <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Ubicación</h3>
+          <div class="flex flex-col gap-2">
+            <a 
+              href={buildFilterUrl('city', null)}
+              class={`text-sm py-1.5 px-3 rounded-lg text-left font-medium transition-all ${cityParam === '' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'}`}
+            >
+              Cualquier ubicación
+            </a>
+            {cities.map((city) => (
+              <a 
+                href={buildFilterUrl('city', city)}
+                class={`text-sm py-1.5 px-3 rounded-lg text-left font-medium transition-all ${cityParam === city ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'}`}
+              >
+                {city}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="pt-4 border-t border-zinc-100">
+          <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Categorías</h3>
+          <div class="flex flex-col gap-1.5">
+            <a 
+              href={buildFilterUrl('category', null)}
+              class={`text-sm py-1.5 px-3 rounded-lg font-medium transition-all ${categoryParam === '' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'}`}
+            >
+              Todas las categorías
+            </a>
+            {categoriesList.map((cat) => (
+              <a 
+                href={buildFilterUrl('category', cat.id)}
+                class={`text-sm py-1.5 px-3 rounded-lg font-medium transition-all flex items-center justify-between ${categoryParam === cat.id ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'}`}
+              >
+                <span>{cat.name}</span>
+                <span class="text-xs text-zinc-400 font-normal">🧩</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <!-- Date / When -->
+        <div class="pt-4 border-t border-zinc-100">
+          <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Cuándo</h3>
+          <div class="grid grid-cols-1 gap-2">
+            <a 
+              href={buildFilterUrl('when', null)}
+              class={`text-sm py-1.5 px-3 rounded-lg font-medium transition-all text-center ${whenParam === '' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50 border border-zinc-200/50 bg-white'}`}
+            >
+              Cualquier fecha
+            </a>
+            <a 
+              href={buildFilterUrl('when', 'sábado')}
+              class={`text-sm py-1.5 px-3 rounded-lg font-medium transition-all text-center ${whenParam === 'sábado' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50 border border-zinc-200/50 bg-white'}`}
+            >
+              Sábados
+            </a>
+            <a 
+              href={buildFilterUrl('when', 'finde')}
+              class={`text-sm py-1.5 px-3 rounded-lg font-medium transition-all text-center ${whenParam === 'finde' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50 border border-zinc-200/50 bg-white'}`}
+            >
+              Fin de semana
+            </a>
+          </div>
+        </div>
+
+        <!-- Accessibility Features -->
+        <div class="pt-4 border-t border-zinc-100">
+          <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Accesibilidad</h3>
+          <div class="space-y-2">
+            {accessibilityList.map((a) => (
+              <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-zinc-600 hover:text-zinc-900">
+                <input 
+                  type="checkbox" 
+                  checked={isA11yChecked(a.id)}
+                  onChange={`window.location.href='${getA11yToggleUrl(a.id)}'`}
+                  class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                />
+                <span>{a.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <!-- Price (Free) Toggle -->
+        <div class="pt-4 border-t border-zinc-100 flex items-center justify-between">
+          <span class="text-sm font-bold text-zinc-800">Actividades gratuitas</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={freeParam} 
+              onChange={`window.location.href='${buildFilterUrl('free', !freeParam)}'`}
+              class="sr-only peer" 
+            />
+            <div class="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+          </label>
+        </div>
+
+      </aside>
+
+      <!-- Main Results Display -->
+      <div class="lg:col-span-3">
+        {viewParam === 'map' ? (
+          <div class="sticky top-20">
+            <MapComponent markers={mapMarkers} center={[-34.5885, -58.4306]} zoom={10} heightClass="h-[550px]" />
+          </div>
+        ) : (
+          <>
+            {activitiesList.length === 0 ? (
+              <div class="flex flex-col items-center justify-center text-center p-12 border border-dashed border-zinc-200 rounded-2xl bg-zinc-50/20">
+                <span class="text-4xl mb-4">🧩</span>
+                <h3 class="text-base font-bold text-zinc-950">No encontramos actividades</h3>
+                <p class="text-sm text-zinc-500 max-w-sm mt-1">Probá cambiando los filtros o buscando otra palabra clave en tu barrio.</p>
+                <a href="/explorar" class="mt-4 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                  Ver todas las actividades
+                </a>
+              </div>
+            ) : (
+              <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {activitiesList.map((act) => (
+                  <ActivityCard activity={act} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+    </div>
+  </div>
+</Layout>

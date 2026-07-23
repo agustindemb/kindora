@@ -1,0 +1,152 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { organizationRepository } from '../../../lib/repositories/organizationRepository';
+import { ArrowLeft, ShieldCheck, FileText, CheckCircle2 } from 'lucide-astro';
+
+const currentUser = Astro.locals.user;
+
+if (!currentUser || (currentUser.role !== 'organizer' && currentUser.role !== 'admin')) {
+  return Astro.redirect('/login');
+}
+
+// Fetch user organization
+const userOrgs = await organizationRepository.getUserOrganizations(currentUser.id);
+if (userOrgs.length === 0) {
+  return Astro.redirect('/dashboard/organizador');
+}
+const org = userOrgs[0];
+
+// If already verified, redirect or show message
+const isVerified = org.verificationLevel !== 'none';
+
+let successMsg = '';
+let errorMsg = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const dni = formData.get('dni') as string;
+    const phone = formData.get('phone') as string;
+    const notes = formData.get('notes') as string;
+
+    // Simulate submitting verification request
+    // We can update organization verificationLevel to 'pending' or log it
+    // For MVP, we will update the verificationLevel to 'verified' directly or mock a pending state.
+    // Let's set the verificationLevel to 'verified' automatically so that it immediately publishes their activities,
+    // OR we can make it actual 'pending' and instruct them that an Admin must approve it from the Admin Panel.
+    // The user said: "La aprobación será manual desde el panel administrador. Las organizaciones verificadas muestran una insignia visible."
+    // So let's update a custom state or simply write a log that the Admin panel will query!
+    // Since we have a 'verificationLevel' column, let's keep it 'none' but set the organization website or notes so that Admins see it.
+    // Better yet, we can set a custom flag or just record the request in the DB logs!
+    // Let's write an organization log:
+    await db.insert(schema.organizationLogs).values({
+      organizationId: org.id,
+      userId: currentUser.id,
+      action: 'verification_requested',
+      details: JSON.stringify({ dni, phone, notes, requestedAt: new Date() }),
+    });
+
+    successMsg = '¡Solicitud enviada con éxito! Tu solicitud está siendo evaluada por el equipo de administración de Kindora.';
+  } catch (err: any) {
+    errorMsg = err.message || 'Error al enviar la solicitud.';
+  }
+}
+
+import * as schema from '../../../lib/db/schema';
+import { db } from '../../../lib/db/client';
+import { eq } from 'drizzle-orm';
+---
+
+<Layout title="Verificar Organización | Kindora">
+  <div class="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- Top Nav -->
+    <a href="/dashboard/organizador" class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-500 hover:text-emerald-600 transition-colors mb-6">
+      <ArrowLeft class="h-4 w-4" />
+      Volver al panel
+    </a>
+
+    <!-- Header -->
+    <div class="space-y-2 mb-8 text-center sm:text-left">
+      <h1 class="text-3xl font-black tracking-tight text-zinc-950 font-sans flex items-center justify-center sm:justify-start gap-2">
+        <ShieldCheck class="h-8 w-8 text-emerald-600" />
+        Verificación de Organización
+      </h1>
+      <p class="text-sm text-zinc-500">
+        Las organizaciones verificadas transmiten mayor confianza y sus actividades son públicas inmediatamente.
+      </p>
+    </div>
+
+    <!-- Content Card -->
+    <div class="bg-white border border-zinc-200/80 rounded-3xl p-6 sm:p-8 shadow-xl shadow-zinc-100/50">
+      {isVerified ? (
+        <div class="text-center py-8 space-y-4">
+          <span class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mx-auto">
+            <CheckCircle2 class="h-8 w-8" />
+          </span>
+          <h2 class="text-xl font-bold text-zinc-900">¡Tu organización ya está verificada!</h2>
+          <p class="text-sm text-zinc-500 max-w-sm mx-auto">
+            Tu nivel actual es <strong class="text-emerald-700 uppercase">{org.verificationLevel}</strong>. Podés publicar actividades ilimitadas de forma pública.
+          </p>
+          <a href="/dashboard/organizador" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
+            Volver a mi panel
+          </a>
+        </div>
+      ) : (
+        <>
+          {successMsg ? (
+            <div class="text-center py-6 space-y-4">
+              <span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mx-auto">
+                <FileText class="h-6 w-6" />
+              </span>
+              <h2 class="text-lg font-bold text-zinc-900">Solicitud en revisión</h2>
+              <p class="text-sm text-zinc-500 max-w-sm mx-auto">
+                {successMsg}
+              </p>
+              <div class="rounded-xl border border-indigo-150 bg-indigo-50/30 p-4 text-xs text-indigo-800 text-left">
+                💡 <strong>Tip de testing:</strong> Iniciá sesión como <strong>Administrador</strong> en la página de login para aprobar esta solicitud instantáneamente desde el panel de administración.
+              </div>
+              <a href="/dashboard/organizador" class="inline-flex items-center justify-center rounded-xl border border-zinc-200 hover:bg-zinc-50 px-5 py-2.5 text-sm font-bold text-zinc-700 transition-all">
+                Volver al panel
+              </a>
+            </div>
+          ) : (
+            <form method="POST" class="space-y-6">
+              
+              {errorMsg && (
+                <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold">
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              <div class="space-y-4">
+                <div>
+                  <label for="dni-val" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Documento de Identidad (DNI del Responsable)</label>
+                  <input type="text" id="dni-val" name="dni" placeholder="ej: 38.456.789" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+                </div>
+
+                <div>
+                  <label for="phone-val" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Teléfono de contacto directo</label>
+                  <input type="tel" id="phone-val" name="phone" placeholder="ej: +54 9 11 5555 5555" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+                </div>
+
+                <div>
+                  <label for="notes-val" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Documentación o Notas Adicionales (Personería Jurídica, Estatuto, etc.)</label>
+                  <textarea id="notes-val" name="notes" rows="4" placeholder="Cualquier información que nos ayude a validar la autenticidad de la organización (ej: Enlaces a registros, número de personería jurídica)..." class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"></textarea>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-zinc-150 bg-zinc-50 p-4 text-xs text-zinc-500">
+                🔒 Tus datos personales de verificación están protegidos y solo se utilizarán con el fin de validar el perfil de la organización.
+              </div>
+
+              <button type="submit" class="w-full flex items-center justify-center rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all">
+                Enviar Solicitud de Verificación
+              </button>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,282 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { db } from '../../lib/db/client';
+import { organizations, organizationStats, user, organizationLogs } from '../../lib/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
+import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText } from 'lucide-astro';
+
+const currentUser = Astro.locals.user;
+
+if (!currentUser || currentUser.role !== 'admin') {
+  return Astro.redirect('/login');
+}
+
+// 1. Fetch Stats
+// We wrap in try/catch to avoid crash if no DB is connected
+let stats = {
+  usersCount: 0,
+  orgsCount: 0,
+  actsCount: 0,
+};
+
+let unverifiedOrgs: any[] = [];
+let pendingVerificationsList: any[] = [];
+
+try {
+  const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user);
+  const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
+  const actsRes = await db.select({ count: sql`count(${schema.activities.id})::int` }).from(schema.activities).where(isNull(schema.activities.deletedAt));
+  
+  stats = {
+    usersCount: usersRes[0]?.count || 0,
+    orgsCount: orgsRes[0]?.count || 0,
+    actsCount: actsRes[0]?.count || 0,
+  };
+
+  // Fetch unverified organizations
+  unverifiedOrgs = await db
+    .select()
+    .from(organizations)
+    .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
+
+  // Fetch logs of verification requests
+  const logs = await db
+    .select({
+      log: organizationLogs,
+      org: organizations,
+      u: user
+    })
+    .from(organizationLogs)
+    .innerJoin(organizations, eq(organizationLogs.organizationId, organizations.id))
+    .innerJoin(user, eq(organizationLogs.userId, user.id))
+    .where(eq(organizationLogs.action, 'verification_requested'))
+    .orderBy(organizationLogs.createdAt);
+
+  pendingVerificationsList = logs.map(l => {
+    let details = { dni: '', phone: '', notes: '' };
+    try {
+      details = JSON.parse(l.log.details || '{}');
+    } catch(e){}
+    return {
+      ...l.log,
+      orgName: l.org.name,
+      orgSlug: l.org.slug,
+      userName: l.u.name,
+      details
+    };
+  });
+} catch(e) {
+  console.warn("DB not connected, using fallback mocks for admin.");
+  const { mockOrganizations } = await import('../../lib/db/mocks');
+  unverifiedOrgs = mockOrganizations.filter(o => o.verificationLevel === 'none');
+  stats = {
+    usersCount: 3,
+    orgsCount: mockOrganizations.length,
+    actsCount: 5,
+  };
+  
+  // mock verification request
+  pendingVerificationsList = [
+    {
+      id: 'mock-req-1',
+      organizationId: 'org-4',
+      orgName: 'Patitas de Palermo',
+      orgSlug: 'patitas-palermo',
+      userName: 'María Gómez',
+      createdAt: new Date(),
+      details: { dni: '38.234.567', phone: '+5491133334444', notes: 'Personería jurídica en trámite, adjunto estatuto provisorio.' }
+    }
+  ];
+}
+
+// Handle POST actions: Approve/Reject Verification requests
+let successMsg = '';
+let errorMsg = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+    const orgId = formData.get('organizationId') as string;
+
+    if (action === 'approve') {
+      const level = formData.get('level') as string || 'verified';
+      
+      // Update organization verification in DB
+      await db.update(organizations).set({
+        verificationLevel: level,
+        verifiedAt: new Date(),
+        verifiedBy: currentUser.id
+      }).where(eq(organizations.id, orgId));
+
+      // Also approve all activities from this organization that are in 'pending_review' -> make them 'published'
+      await db.update(schema.activities).set({
+        status: 'published'
+      }).where(and(eq(schema.activities.organizationId, orgId), eq(schema.activities.status, 'pending_review')));
+
+      // Log action
+      await db.insert(schema.organizationLogs).values({
+        organizationId: orgId,
+        userId: currentUser.id,
+        action: 'verified',
+        details: JSON.stringify({ level, verifiedAt: new Date() }),
+      });
+
+      successMsg = `Organización aprobada con nivel: ${level.toUpperCase()}. Sus actividades pendientes han sido publicadas.`;
+
+      // Refresh
+      return Astro.redirect('/admin');
+
+    } else if (action === 'reject') {
+      // Remove verification requested logs
+      await db.delete(organizationLogs).where(
+        and(
+          eq(organizationLogs.organizationId, orgId),
+          eq(organizationLogs.action, 'verification_requested')
+        )
+      );
+      
+      successMsg = 'Solicitud de verificación rechazada.';
+      return Astro.redirect('/admin');
+    }
+  } catch (err: any) {
+    errorMsg = err.message || 'Error al procesar la solicitud.';
+  }
+}
+
+import * as schema from '../../lib/db/schema';
+import { sql } from 'drizzle-orm';
+---
+
+<Layout title="Panel Administrador | Kindora">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-6 mb-8">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
+          <ShieldCheck class="h-8 w-8 text-purple-600" />
+          Panel Administrador
+        </h1>
+        <p class="text-sm text-zinc-500 mt-1">Monitoreá la plataforma, verificá organizaciones y moderá contenido.</p>
+      </div>
+      <div class="text-xs font-semibold text-zinc-400 bg-zinc-100 px-3 py-1.5 rounded-xl self-start">
+        Modo de simulación activa (Admin)
+      </div>
+    </div>
+
+    <!-- Stats widgets -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
+          <Users class="h-6 w-6" />
+        </span>
+        <div>
+          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Usuarios totales</span>
+          <span class="text-2xl font-black text-zinc-950 block">{stats.usersCount}</span>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
+          <Building2 class="h-6 w-6" />
+        </span>
+        <div>
+          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Organizaciones</span>
+          <span class="text-2xl font-black text-zinc-950 block">{stats.orgsCount}</span>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm flex items-center gap-4">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
+          <Calendar class="h-6 w-6" />
+        </span>
+        <div>
+          <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Actividades creadas</span>
+          <span class="text-2xl font-black text-zinc-950 block">{stats.actsCount}</span>
+        </div>
+      </div>
+    </div>
+
+    {successMsg && (
+      <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800 font-semibold mb-6 shadow-sm">
+        {successMsg}
+      </div>
+    )}
+    {errorMsg && (
+      <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold mb-6 shadow-sm">
+        {errorMsg}
+      </div>
+    )}
+
+    <!-- Verification Requests list -->
+    <div class="space-y-6">
+      <h2 class="text-xl font-bold text-zinc-950">Solicitudes de verificación pendientes ({pendingVerificationsList.length})</h2>
+
+      {pendingVerificationsList.length === 0 ? (
+        <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay solicitudes de verificación pendientes por el momento.</p>
+      ) : (
+        <div class="grid grid-cols-1 gap-6">
+          {pendingVerificationsList.map((req) => (
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 pb-3 flex-wrap gap-2">
+                <div>
+                  <h3 class="text-base font-bold text-zinc-950 leading-tight">
+                    <a href={`/organizacion/${req.orgSlug}`} target="_blank" class="hover:text-emerald-600 transition-colors">
+                      {req.orgName}
+                    </a>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-0.5">Solicitado por: <strong>{req.userName}</strong> el {new Date(req.createdAt).toLocaleDateString('es-AR')}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <!-- Approve Form -->
+                  <form method="POST" class="m-0 flex items-center gap-2">
+                    <input type="hidden" name="action" value="approve" />
+                    <input type="hidden" name="organizationId" value={req.organizationId} />
+                    
+                    <select name="level" class="rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-semibold focus:outline-none">
+                      <option value="verified">Verified (Común)</option>
+                      <option value="foundation">Foundation (Fundación)</option>
+                      <option value="official">Official (Oficial)</option>
+                      <option value="municipality">Municipality (Municipio)</option>
+                    </select>
+
+                    <button type="submit" class="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all">
+                      <CheckCircle2 class="h-3.5 w-3.5" />
+                      Aprobar
+                    </button>
+                  </form>
+
+                  <!-- Reject Form -->
+                  <form method="POST" class="m-0">
+                    <input type="hidden" name="action" value="reject" />
+                    <input type="hidden" name="organizationId" value={req.organizationId} />
+                    <button type="submit" class="inline-flex items-center gap-1 rounded-xl border border-zinc-200 hover:bg-rose-50 hover:text-rose-700 px-3 py-1.5 text-xs font-bold text-zinc-600 transition-all">
+                      <XCircle class="h-3.5 w-3.5" />
+                      Rechazar
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Request details details -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span class="block font-bold text-zinc-400 uppercase tracking-wider">DNI Responsable</span>
+                  <span class="block font-semibold text-zinc-800 mt-1">{req.details.dni || 'No provisto'}</span>
+                </div>
+                <div>
+                  <span class="block font-bold text-zinc-400 uppercase tracking-wider">Teléfono de Validación</span>
+                  <span class="block font-semibold text-zinc-800 mt-1">{req.details.phone || 'No provisto'}</span>
+                </div>
+                <div class="md:col-span-3">
+                  <span class="block font-bold text-zinc-400 uppercase tracking-wider mb-1">Documentación / Notas presentadas</span>
+                  <p class="text-zinc-600 leading-relaxed bg-zinc-50 border border-zinc-100 p-3 rounded-xl">{req.details.notes || 'Sin aclaraciones adicionales.'}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+  </div>
+</Layout>

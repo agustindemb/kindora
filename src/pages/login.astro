@@ -1,0 +1,261 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { db } from '../lib/db/client';
+import { session, user, verification } from '../lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { ShieldCheck, Mail, ArrowRight, Star, Building2, Heart } from 'lucide-astro';
+
+const currentRole = Astro.url.searchParams.get('role') || 'participant';
+let errorMessage = '';
+let successMessage = '';
+
+// Handle POST request for mock login or Magic Link request
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+
+    if (action === 'mock_login') {
+      const selectedUserId = formData.get('userId') as string;
+      
+      // 1. Fetch user to make sure it exists
+      const targetUser = await db.select().from(user).where(eq(user.id, selectedUserId)).limit(1);
+      
+      let mockName = selectedUserId === 'usr_admin' ? 'Admin Kindora' : selectedUserId === 'usr_org' ? 'María Gómez' : 'Juan Pérez';
+      let mockEmail = selectedUserId === 'usr_admin' ? 'admin@kindora.com' : selectedUserId === 'usr_org' ? 'organizador@kindora.com' : 'participante@kindora.com';
+      let mockRole = selectedUserId === 'usr_admin' ? 'admin' : selectedUserId === 'usr_org' ? 'organizer' : 'participant';
+      
+      if (targetUser.length === 0) {
+        // Create user
+        const now = new Date();
+        try {
+          await db.insert(user).values({
+            id: selectedUserId,
+            name: mockName,
+            email: mockEmail,
+            emailVerified: true,
+            role: mockRole,
+            createdAt: now,
+            updatedAt: now,
+          });
+        } catch (e) {
+          throw new Error("No se pudo conectar a la base de datos para crear el usuario de prueba.");
+        }
+      } else {
+        // Ensure email and role match the mock button
+        mockEmail = targetUser[0].email;
+        mockRole = targetUser[0].role;
+      }
+
+      // Determine dashboard URL
+      const targetDashboard = mockRole === 'admin' ? '/admin' : mockRole === 'organizer' ? '/dashboard/organizador' : '/dashboard/participante';
+
+      // 2. Generate magic link token in database
+      const verificationToken = "mock_token_" + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+      
+      await db.insert(verification).values({
+        id: verificationToken,
+        identifier: mockEmail,
+        value: verificationToken,
+        expiresAt,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      // 3. Redirect to Better Auth Magic Link Callback
+      // This forces Better Auth to create the session and generate the signed cookie correctly
+      return Astro.redirect(`/api/auth/magic-link/verify?token=${verificationToken}&callbackURL=${encodeURIComponent(targetDashboard)}`);
+
+    } else if (action === 'magic_link') {
+      const emailVal = formData.get('email') as string;
+      if (!emailVal) {
+        errorMessage = 'Por favor ingresá un correo válido.';
+      } else {
+        // Trigger Better Auth native magic link sending flow
+        const { auth } = await import('../lib/auth/auth');
+        // We pass the raw request and URL context to Better Auth
+        await auth.api.signInMagicLink({
+          body: {
+            email: emailVal,
+            callbackURL: '/dashboard/participante',
+          },
+          headers: Astro.request.headers,
+        });
+        successMessage = '¡Enlace enviado! Buscá en la consola de tu terminal de desarrollo el enlace para iniciar sesión.';
+      }
+    }
+  } catch (err: any) {
+    console.error("Login action error:", err);
+    errorMessage = err.message || 'Ocurrió un error al intentar iniciar sesión.';
+  }
+}
+---
+
+<Layout title="Iniciar sesión | Kindora" showFooter={false}>
+  <div class="min-h-[calc(100vh-64px)] grid grid-cols-1 lg:grid-cols-12 bg-white">
+    <!-- Left Column: Branding / Info -->
+    <div class="hidden lg:flex lg:col-span-5 bg-zinc-950 p-12 flex-col justify-between text-white relative overflow-hidden">
+      <!-- Background pattern -->
+      <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
+      
+      <!-- Brand Logo -->
+      <a href="/" class="flex items-center gap-2 relative z-10">
+        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-base shadow-sm">K</span>
+        <span class="text-lg font-bold tracking-tight">Kindora</span>
+      </a>
+
+      <!-- Big Quote -->
+      <div class="space-y-6 relative z-10 max-w-md">
+        <div class="flex items-center gap-0.5 text-amber-400">
+          {Array.from({ length: 5 }).map(() => <Star class="h-4 w-4 fill-current" />)}
+        </div>
+        <p class="text-xl font-medium leading-relaxed italic text-zinc-200">
+          "Kindora nos ayudó a descubrir un mundo de actividades hermosas cerca de casa. El diseño y la facilidad para inscribirnos me transmitieron confianza desde el primer día."
+        </p>
+        <div>
+          <p class="font-bold text-sm text-zinc-100">Silvia Valenzuela</p>
+          <p class="text-xs text-zinc-400">Madre de Lucas, inscripto en Talleres TEA</p>
+        </div>
+      </div>
+
+      <!-- Footer Copy -->
+      <p class="text-xs text-zinc-500 relative z-10">
+        Kindora MVP - Todos los derechos reservados.
+      </p>
+    </div>
+
+    <!-- Right Column: Login Forms -->
+    <div class="lg:col-span-7 flex items-center justify-center p-8 sm:p-12 md:p-16">
+      <div class="w-full max-w-md space-y-8">
+        
+        <!-- Header -->
+        <div class="space-y-2">
+          <h2 class="text-3xl font-black text-zinc-900 tracking-tight">
+            Ingresá a la comunidad
+          </h2>
+          <p class="text-sm text-zinc-500">
+            Descubrí y participá en actividades con impacto social.
+          </p>
+        </div>
+
+        {errorMessage && (
+          <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-medium">
+            ⚠️ {errorMessage}
+          </div>
+        )}
+
+        {successMessage && (
+          <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800 font-medium">
+            📧 {successMessage}
+          </div>
+        )}
+
+        <!-- Quick Access Mock Accounts (PREMIUM TEST EXPERIENCE) -->
+        <div class="rounded-2xl border border-zinc-200/80 bg-zinc-50/50 p-6 space-y-4">
+          <div>
+            <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <ShieldCheck class="h-4 w-4 text-emerald-600" />
+              Acceso rápido para testing (MVP)
+            </h3>
+            <p class="text-[11px] text-zinc-400">Iniciá sesión al instante con roles pre-configurados para probar el flujo.</p>
+          </div>
+          
+          <div class="grid grid-cols-1 gap-2.5">
+            <!-- 1. Participante Mock -->
+            <form method="POST" class="m-0">
+              <input type="hidden" name="action" value="mock_login" />
+              <input type="hidden" name="userId" value="usr_part" />
+              <button 
+                type="submit" 
+                class="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:border-emerald-300 hover:bg-emerald-50/10 hover:text-emerald-700 transition-all text-left"
+              >
+                <div class="flex items-center gap-2.5">
+                  <Heart class="h-4 w-4 text-rose-500" />
+                  <div>
+                    <span class="block text-zinc-900 font-bold">Ingresar como Participante</span>
+                    <span class="block text-[10px] text-zinc-400 font-normal">Juan Pérez - Explorá y registrate</span>
+                  </div>
+                </div>
+                <ArrowRight class="h-4 w-4 opacity-50" />
+              </button>
+            </form>
+
+            <!-- 2. Organizador Mock -->
+            <form method="POST" class="m-0">
+              <input type="hidden" name="action" value="mock_login" />
+              <input type="hidden" name="userId" value="usr_org" />
+              <button 
+                type="submit" 
+                class="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:border-emerald-300 hover:bg-emerald-50/10 hover:text-emerald-700 transition-all text-left"
+              >
+                <div class="flex items-center gap-2.5">
+                  <Building2 class="h-4 w-4 text-indigo-500" />
+                  <div>
+                    <span class="block text-zinc-900 font-bold">Ingresar como Organizador</span>
+                    <span class="block text-[10px] text-zinc-400 font-normal">María Gómez - Creá y publicá actividades</span>
+                  </div>
+                </div>
+                <ArrowRight class="h-4 w-4 opacity-50" />
+              </button>
+            </form>
+
+            <!-- 3. Administrador Mock -->
+            <form method="POST" class="m-0">
+              <input type="hidden" name="action" value="mock_login" />
+              <input type="hidden" name="userId" value="usr_admin" />
+              <button 
+                type="submit" 
+                class="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:border-emerald-300 hover:bg-emerald-50/10 hover:text-emerald-700 transition-all text-left"
+              >
+                <div class="flex items-center gap-2.5">
+                  <ShieldCheck class="h-4 w-4 text-emerald-600" />
+                  <div>
+                    <span class="block text-zinc-900 font-bold">Ingresar como Administrador</span>
+                    <span class="block text-[10px] text-zinc-400 font-normal">Panel Admin - Moderación y verficaciones</span>
+                  </div>
+                </div>
+                <ArrowRight class="h-4 w-4 opacity-50" />
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div class="relative flex items-center justify-center py-2">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-zinc-100"></div>
+          </div>
+          <span class="relative bg-white px-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">O continuar con</span>
+        </div>
+
+        <!-- Magic Link Form -->
+        <form method="POST" class="space-y-4">
+          <input type="hidden" name="action" value="magic_link" />
+          
+          <div>
+            <label for="email" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Correo electrónico</label>
+            <div class="relative rounded-xl border border-zinc-200 focus-within:border-emerald-500 transition-colors">
+              <input 
+                type="email" 
+                id="email" 
+                name="email" 
+                placeholder="vos@ejemplo.com"
+                class="w-full pl-10 pr-4 py-3 text-sm focus:outline-none rounded-xl bg-white font-medium"
+                required
+              />
+              <Mail class="h-4 w-4 text-zinc-400 absolute left-3.5 top-3.5" />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            class="w-full flex items-center justify-center rounded-2xl bg-zinc-900 py-3.5 text-sm font-bold text-white hover:bg-zinc-800 transition-all"
+          >
+            Enviar enlace mágico
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</Layout>

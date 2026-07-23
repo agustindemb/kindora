@@ -1,0 +1,325 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ActivityCard from '../../components/ActivityCard.astro';
+import { activityRepository } from '../../lib/repositories/activityRepository';
+import { userRepository } from '../../lib/repositories/userRepository';
+import { notificationService } from '../../services/notificationService';
+import { Calendar, Heart, User, Bell, Settings, Star, AlertCircle } from 'lucide-astro';
+
+const currentUser = Astro.locals.user;
+
+if (!currentUser) {
+  return Astro.redirect('/login');
+}
+
+// Fetch participant data
+const inscriptionsList = await activityRepository.getUserInscriptions(currentUser.id);
+const bookmarkedActivities = await activityRepository.getBookmarkedActivities(currentUser.id);
+const notificationsList = await notificationService.getUserNotifications(currentUser.id);
+
+// Split registered activities
+const now = new Date();
+const upcomingInscriptions = inscriptionsList.filter((ins) => new Date(ins.activity.startsAt) > now && ins.status === 'registered');
+const pastInscriptions = inscriptionsList.filter((ins) => new Date(ins.activity.startsAt) <= now || ins.status === 'attended');
+
+// Handle Profile Updates POST
+let successMsg = '';
+let errorMsg = '';
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+
+    if (action === 'update_profile') {
+      const name = formData.get('name') as string;
+      const phone = formData.get('phone') as string;
+      
+      await userRepository.update(currentUser.id, {
+        name,
+        phone,
+      });
+
+      // Update current instance
+      currentUser.name = name;
+      currentUser.phone = phone;
+      successMsg = '¡Tu perfil se actualizó correctamente!';
+    }
+  } catch (err: any) {
+    errorMsg = err.message || 'Error al guardar los datos.';
+  }
+}
+---
+
+<Layout title="Mi Cuenta | Kindora">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- User Header Banner -->
+    <div class="rounded-3xl border border-zinc-100 bg-zinc-50/50 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <div class="flex items-center gap-4">
+        <img 
+          src={currentUser.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser.name}`} 
+          alt={currentUser.name} 
+          class="h-16 w-16 md:h-20 md:w-20 rounded-full object-cover border-2 border-white shadow-md"
+        />
+        <div>
+          <span class="inline-flex rounded-lg bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 uppercase tracking-wider mb-1.5">Participante</span>
+          <h1 class="text-2xl font-black text-zinc-950 tracking-tight leading-none mb-1">{currentUser.name}</h1>
+          <p class="text-xs text-zinc-500">{currentUser.email}</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-zinc-500">
+        <div class="bg-white border border-zinc-100 rounded-xl px-4 py-2.5 text-center shadow-sm">
+          <span class="block text-lg font-black text-zinc-900 leading-none mb-1">{inscriptionsList.length}</span>
+          <span>Registradas</span>
+        </div>
+        <div class="bg-white border border-zinc-100 rounded-xl px-4 py-2.5 text-center shadow-sm">
+          <span class="block text-lg font-black text-zinc-900 leading-none mb-1">{bookmarkedActivities.length}</span>
+          <span>Favoritos</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs / Sections -->
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-4">
+      
+      <!-- Sidebar Tabs selector -->
+      <aside class="lg:col-span-1 border border-zinc-100 rounded-2xl p-4 bg-zinc-50/30 self-start">
+        <nav class="flex flex-col gap-1.5" id="dashboard-tabs">
+          <button 
+            type="button" 
+            class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left bg-emerald-50 text-emerald-700 transition-all"
+            data-tab="mis-actividades"
+          >
+            <Calendar class="h-4.5 w-4.5" />
+            Mis Actividades
+          </button>
+          <button 
+            type="button" 
+            class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
+            data-tab="favoritos"
+          >
+            <Heart class="h-4.5 w-4.5" />
+            Favoritos
+          </button>
+          <button 
+            type="button" 
+            class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
+            data-tab="perfil"
+          >
+            <User class="h-4.5 w-4.5" />
+            Mi Perfil
+          </button>
+          <button 
+            type="button" 
+            class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all justify-between"
+            data-tab="notificaciones"
+          >
+            <span class="flex items-center gap-2.5">
+              <Bell class="h-4.5 w-4.5" />
+              Notificaciones
+            </span>
+            {notificationsList.filter(n => !n.readAt).length > 0 && (
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white leading-none">
+                {notificationsList.filter(n => !n.readAt).length}
+              </span>
+            )}
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Content Display Panel -->
+      <div class="lg:col-span-3 space-y-6">
+        
+        <!-- Action feedback alerts -->
+        {successMsg && (
+          <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800 font-semibold shadow-sm">
+            {successMsg}
+          </div>
+        )}
+        {errorMsg && (
+          <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold shadow-sm">
+            {errorMsg}
+          </div>
+        )}
+
+        <!-- Tab 1: Mis Actividades -->
+        <section id="tab-content-mis-actividades" class="space-y-8 block">
+          
+          <!-- Upcoming Activities -->
+          <div class="space-y-4">
+            <h2 class="text-xl font-bold text-zinc-950">Próximas actividades</h2>
+            {upcomingInscriptions.length === 0 ? (
+              <div class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-zinc-200 rounded-2xl bg-zinc-50/20">
+                <span class="text-3xl mb-3">📅</span>
+                <h3 class="text-sm font-bold text-zinc-800">No tenés actividades agendadas</h3>
+                <p class="text-xs text-zinc-500 max-w-xs mt-0.5">Explorá la plataforma para encontrar tu próximo taller o voluntariado.</p>
+                <a href="/explorar" class="mt-3 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                  Buscar actividades
+                </a>
+              </div>
+            ) : (
+              <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {upcomingInscriptions.map((ins) => (
+                  <ActivityCard activity={ins.activity} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <!-- Past Activities / History -->
+          <div class="space-y-4 pt-6 border-t border-zinc-100">
+            <h2 class="text-xl font-bold text-zinc-950">Historial y asistencia</h2>
+            {pastInscriptions.length === 0 ? (
+              <p class="text-xs text-zinc-500">Aún no participaste de actividades en la plataforma.</p>
+            ) : (
+              <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {pastInscriptions.map((ins) => (
+                  <div>
+                    <ActivityCard activity={ins.activity} />
+                    <div class="mt-3">
+                      <a 
+                        href={`/actividad/${ins.activity.id}-${ins.activity.slug}#opiniones`} 
+                        class="w-full inline-flex items-center justify-center gap-1 text-xs font-bold border border-zinc-200 bg-white hover:bg-zinc-50 px-3 py-2 rounded-xl text-zinc-700 transition-all"
+                      >
+                        <Star class="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                        Dejar reseña
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </section>
+
+        <!-- Tab 2: Favoritos -->
+        <section id="tab-content-favoritos" class="space-y-4 hidden">
+          <h2 class="text-xl font-bold text-zinc-950">Actividades guardadas</h2>
+          {bookmarkedActivities.length === 0 ? (
+            <div class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-zinc-200 rounded-2xl bg-zinc-50/20">
+              <span class="text-3xl mb-3">❤️</span>
+              <h3 class="text-sm font-bold text-zinc-800">Todavía no guardaste actividades</h3>
+              <p class="text-xs text-zinc-500 max-w-xs mt-0.5">Hacé click en el corazón de las tarjetas para guardar actividades interesantes.</p>
+            </div>
+          ) : (
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {bookmarkedActivities.map((act) => (
+                <ActivityCard activity={act} isBookmarked={true} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <!-- Tab 3: Mi Perfil -->
+        <section id="tab-content-perfil" class="space-y-6 hidden">
+          <div class="space-y-1">
+            <h2 class="text-xl font-bold text-zinc-950 font-sans">Mi Perfil</h2>
+            <p class="text-xs text-zinc-500">Mantené tus datos de contacto al día para recibir recordatorios.</p>
+          </div>
+          
+          <form method="POST" class="space-y-4 max-w-lg">
+            <input type="hidden" name="action" value="update_profile" />
+            
+            <div>
+              <label for="profile-name" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nombre completo</label>
+              <input 
+                type="text" 
+                id="profile-name"
+                name="name" 
+                value={currentUser.name}
+                class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"
+                required
+              />
+            </div>
+
+            <div>
+              <label for="profile-phone" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Teléfono / Celular</label>
+              <input 
+                type="tel" 
+                id="profile-phone"
+                name="phone" 
+                value={currentUser.phone || ''}
+                placeholder="ej: +54 9 11 5555-5555"
+                class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"
+              />
+              <p class="text-[10px] text-zinc-400 mt-1">Vinculá tu número celular para habilitar notificaciones por WhatsApp en el futuro.</p>
+            </div>
+
+            <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
+              Guardar cambios
+            </button>
+          </form>
+        </section>
+
+        <!-- Tab 4: Notificaciones -->
+        <section id="tab-content-notificaciones" class="space-y-4 hidden">
+          <h2 class="text-xl font-bold text-zinc-950">Notificaciones recibidas</h2>
+          {notificationsList.length === 0 ? (
+            <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No tenés notificaciones pendientes.</p>
+          ) : (
+            <div class="space-y-3">
+              {notificationsList.map((notif) => (
+                <div class={`rounded-xl border p-4 flex gap-3 ${notif.readAt ? 'bg-white border-zinc-100 text-zinc-600' : 'bg-emerald-50/10 border-emerald-100 text-zinc-800 font-medium'}`}>
+                  <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-zinc-100 flex-shrink-0">
+                    <span class="text-lg">📢</span>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold leading-tight">{notif.title}</h4>
+                    <p class="text-xs text-zinc-500 mt-0.5">{notif.body}</p>
+                    <time class="text-[10px] text-zinc-400 block mt-1.5">
+                      {new Date(notif.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} hs
+                    </time>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+      </div>
+
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Simple client-side tab switching
+  const tabs = document.querySelectorAll('#dashboard-tabs button');
+  const sections = document.querySelectorAll('section[id^="tab-content-"]');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.getAttribute('data-tab');
+      
+      // Update Tab button active styling
+      tabs.forEach(t => {
+        t.classList.remove('bg-emerald-50', 'text-emerald-700');
+        t.classList.add('text-zinc-600', 'hover:bg-zinc-50');
+      });
+      tab.classList.remove('text-zinc-600', 'hover:bg-zinc-50');
+      tab.classList.add('bg-emerald-50', 'text-emerald-700');
+
+      // Update Section visibility
+      sections.forEach(sec => {
+        if (sec.id === `tab-content-${target}`) {
+          sec.classList.remove('hidden');
+          sec.classList.add('block');
+        } else {
+          sec.classList.remove('block');
+          sec.classList.add('hidden');
+        }
+      });
+    });
+  });
+
+  // Handle direct tab anchors in URL (e.g. #favoritos)
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      const matchingTab = document.querySelector(`[data-tab="${hash}"]`);
+      if (matchingTab) (matchingTab as HTMLElement).click();
+    }
+  });
+</script>

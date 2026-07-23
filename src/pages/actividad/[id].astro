@@ -1,0 +1,477 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import MapComponent from '../../components/MapComponent.astro';
+import ReviewCard from '../../components/ReviewCard.astro';
+import ActivityCard from '../../components/ActivityCard.astro';
+import { activityRepository } from '../../lib/repositories/activityRepository';
+import { reviewRepository } from '../../lib/repositories/reviewRepository';
+import { organizationRepository } from '../../lib/repositories/organizationRepository';
+import { ArrowLeft, Calendar, Clock, MapPin, User, Mail, Phone, Heart, CheckCircle2, ChevronRight, Share2, Star } from 'lucide-astro';
+
+const rawId = Astro.params.id || "";
+// UUID regex to parse ID safely
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const match = rawId.match(uuidRegex);
+const id = match ? match[0] : rawId.split('-')[0];
+const slugInUrl = rawId.replace(id + '-', '');
+
+// Fetch Activity details
+const activity = await activityRepository.findById(id);
+
+if (!activity) {
+  return Astro.redirect('/404');
+}
+
+// SEO Redirect: if the slug in the URL is old or incorrect, redirect 301
+if (slugInUrl !== activity.slug) {
+  return Astro.redirect(`/actividad/${activity.id}-${activity.slug}`, 301);
+}
+
+const currentUser = Astro.locals.user;
+
+// Increment views count asynchronously
+activityRepository.incrementViews(activity.id, currentUser?.id);
+
+// Check if user is registered in this activity
+let isRegistered = false;
+let hasAttended = false;
+if (currentUser) {
+  const userInscriptions = await activityRepository.getUserInscriptions(currentUser.id);
+  const currentIns = userInscriptions.find((ins) => ins.activityId === activity.id);
+  if (currentIns) {
+    isRegistered = currentIns.status === 'registered';
+    hasAttended = currentIns.status === 'attended';
+  }
+}
+
+// Check if user has bookmarked this activity
+const isBookmarked = currentUser ? await activityRepository.isBookmarked(currentUser.id, activity.id) : false;
+
+// Check if user follows the organization
+const isFollowingOrg = currentUser ? await organizationRepository.isFollowing(currentUser.id, activity.organizationId) : false;
+
+// Fetch reviews
+const reviewsList = await reviewRepository.getByActivity(activity.id);
+const averageRating = reviewsList.length > 0
+  ? (reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)
+  : "0.0";
+
+// Fetch similar activities
+const similarActivities = await activityRepository.list({
+  categoryId: activity.categoryId,
+  limit: 3,
+});
+const filteredSimilar = similarActivities.filter((a) => a.id !== activity.id).slice(0, 3);
+
+// Format times
+const startDate = new Date(activity.startsAt);
+const endDate = new Date(activity.endsAt);
+const formattedStartDate = startDate.toLocaleDateString('es-AR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric'
+});
+const formattedStartTime = startDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const formattedEndTime = endDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+const spotsLeft = Math.max(0, activity.capacity - activity.confirmedRegistrations);
+const isSoldOut = spotsLeft === 0;
+
+// Images gallery
+const coverImage = activity.images?.find((img) => img.isCover)?.url 
+  || activity.images?.[0]?.url 
+  || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800";
+const secondaryImages = activity.images?.filter((img) => !img.isCover) || [];
+
+// JSON-LD structured data for Google SEO
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": activity.title,
+  "description": activity.description,
+  "startDate": activity.startsAt.toISOString(),
+  "endDate": activity.endsAt.toISOString(),
+  "eventStatus": activity.status === 'cancelled' ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "location": {
+    "@type": "Place",
+    "name": activity.location.address,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": activity.location.address,
+      "addressLocality": activity.location.city,
+      "addressRegion": activity.location.province,
+      "addressCountry": "AR"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": activity.location.latitude,
+      "longitude": activity.location.longitude
+    }
+  },
+  "image": [coverImage],
+  "organizer": {
+    "@type": "Organization",
+    "name": activity.organization.name,
+    "url": `https://kindora.proasc.com/organizacion/${activity.organization.slug}`
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": parseFloat(activity.price) === 0 ? "0" : activity.price,
+    "priceCurrency": "ARS",
+    "availability": isSoldOut ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+    "validFrom": activity.createdAt.toISOString()
+  }
+};
+---
+
+<Layout 
+  title={`${activity.title} | Kindora`} 
+  description={activity.description.substring(0, 160)}
+  image={coverImage}
+>
+  <!-- SEO Structuring JSON-LD -->
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+  <!-- Breadcrumbs & Actions bar -->
+  <div class="bg-zinc-50 border-b border-zinc-100 py-4">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <a href="/explorar" class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-500 hover:text-emerald-600 transition-colors">
+        <ArrowLeft class="h-4 w-4" />
+        Volver a explorar
+      </a>
+      <div class="flex items-center gap-2">
+        <button class="inline-flex items-center justify-center p-2 rounded-xl bg-white border border-zinc-200 text-zinc-600 hover:text-emerald-600 hover:border-emerald-200 transition-colors" aria-label="Compartir actividad">
+          <Share2 class="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+      
+      <!-- Left Column: Details -->
+      <div class="lg:col-span-8 space-y-8">
+        
+        <!-- Title & Category -->
+        <div class="space-y-4">
+          <span class="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            {activity.category?.name}
+          </span>
+          <h1 class="text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-4xl leading-tight">
+            {activity.title}
+          </h1>
+          
+          <!-- Org card mini -->
+          <div class="flex items-center gap-3 border-b border-zinc-100 pb-6">
+            <img 
+              src={activity.organization?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${activity.organization?.name}`}
+              alt={activity.organization?.name}
+              class="h-10 w-10 rounded-full object-cover border border-zinc-100"
+            />
+            <div>
+              <p class="text-xs text-zinc-400 font-medium">Organizado por</p>
+              <a href={`/organizacion/${activity.organization?.slug}`} class="text-sm font-bold text-zinc-900 hover:text-emerald-600 flex items-center gap-1">
+                {activity.organization?.name}
+                {activity.organization?.verificationLevel !== 'none' && (
+                  <CheckCircle2 class="h-4 w-4 fill-emerald-500 text-white" />
+                )}
+              </a>
+            </div>
+            
+            <!-- Follow Button in memory -->
+            <button 
+              type="button"
+              class={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${isFollowingOrg ? 'bg-zinc-100 border-zinc-200 text-zinc-600' : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'}`}
+              onclick={`alert("¡Ahora seguís a ${activity.organization?.name}! Te notificaremos sobre sus nuevas actividades.")`}
+            >
+              {isFollowingOrg ? 'Siguiendo' : '+ Seguir'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Big Gallery / Cover -->
+        <div class="space-y-3">
+          <div class="aspect-[16/9] w-full overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50">
+            <img 
+              src={coverImage} 
+              alt={activity.title}
+              class="h-full w-full object-cover"
+            />
+          </div>
+          {secondaryImages.length > 0 && (
+            <div class="grid grid-cols-4 gap-3">
+              {secondaryImages.map((img) => (
+                <div class="aspect-video overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50 cursor-pointer">
+                  <img src={img.url} alt={activity.title} class="h-full w-full object-cover hover:opacity-90 transition-opacity" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Date, Time & Coordinates Box -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl border border-zinc-100 bg-zinc-50/50 p-6">
+          <div class="flex gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm flex-shrink-0">
+              <Calendar class="h-5 w-5" />
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-zinc-900">Fecha</h3>
+              <p class="text-sm text-zinc-600 capitalize mt-0.5">{formattedDate}</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm flex-shrink-0">
+              <Clock class="h-5 w-5" />
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-zinc-900">Horario</h3>
+              <p class="text-sm text-zinc-600 mt-0.5">{formattedStartTime} hs a {formattedEndTime} hs</p>
+              <p class="text-[10px] text-zinc-400 uppercase mt-0.5">Zona horaria: {activity.timezone.replace('_', ' ')}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="space-y-4">
+          <h2 class="text-xl font-bold text-zinc-950">Sobre esta actividad</h2>
+          <div class="text-sm text-zinc-700 leading-relaxed space-y-4 whitespace-pre-line">
+            {activity.description}
+          </div>
+        </div>
+
+        <!-- Accessibility features list -->
+        <div class="space-y-4 pt-6 border-t border-zinc-100">
+          <h2 class="text-xl font-bold text-zinc-950">Facilidades de accesibilidad</h2>
+          {activity.accessibility?.length === 0 ? (
+            <p class="text-sm text-zinc-500">No se especificaron facilidades especiales para esta actividad.</p>
+          ) : (
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activity.accessibility?.map((feat) => (
+                <div class="flex items-center gap-3 border border-zinc-100 rounded-xl p-3.5 bg-white shadow-sm">
+                  <span class="text-2xl">{feat.name.includes("TEA") ? "🧩" : feat.name.includes("silla") ? "♿" : feat.name.includes("Baño") ? "🚽" : "🤝"}</span>
+                  <span class="text-sm font-semibold text-zinc-800">{feat.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Coordinator Contact Details -->
+        <div class="space-y-4 pt-6 border-t border-zinc-100">
+          <h2 class="text-xl font-bold text-zinc-950">Contacto de coordinación</h2>
+          <div class="rounded-2xl border border-zinc-100 p-6 bg-white shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="flex items-center gap-3">
+              <User class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p class="text-[10px] font-bold text-zinc-400 uppercase">Coordinador/a</p>
+                <p class="text-sm font-bold text-zinc-800">{activity.contactName || activity.organization.contactPerson || 'No especificado'}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <Mail class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p class="text-[10px] font-bold text-zinc-400 uppercase">Correo</p>
+                <a href={`mailto:${activity.contactEmail || activity.organization.email}`} class="text-sm font-semibold text-emerald-600 hover:underline truncate block max-w-[200px]">
+                  {activity.contactEmail || activity.organization.email || 'No disponible'}
+                </a>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <Phone class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p class="text-[10px] font-bold text-zinc-400 uppercase">Teléfono / WhatsApp</p>
+                <p class="text-sm font-semibold text-zinc-800">{activity.contactPhone || activity.organization.phone || 'No disponible'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Location Map preview -->
+        <div class="space-y-4 pt-6 border-t border-zinc-100">
+          <h2 class="text-xl font-bold text-zinc-950">¿Dónde nos encontramos?</h2>
+          <div class="flex items-center gap-2 text-sm text-zinc-600 mb-3">
+            <MapPin class="h-4 w-4 text-emerald-600 flex-shrink-0" />
+            <span>{activity.location.address}, {activity.location.city}, {activity.location.province}</span>
+          </div>
+          <!-- Single Pin Leaflet Map -->
+          <MapComponent 
+            markers={[{ id: activity.id, title: activity.title, lat: activity.location.latitude || -34.6037, lng: activity.location.longitude || -58.3816, address: activity.location.address }]} 
+            center={[activity.location.latitude || -34.6037, activity.location.longitude || -58.3816]} 
+            zoom={14} 
+            heightClass="h-72" 
+          />
+        </div>
+
+        <!-- Reviews Block -->
+        <div class="space-y-6 pt-6 border-t border-zinc-100">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-zinc-950">Opiniones de asistentes ({reviewsList.length})</h2>
+            <div class="flex items-center gap-1">
+              <Star class="h-5 w-5 fill-amber-400 text-amber-400" />
+              <span class="text-base font-bold text-zinc-900">{averageRating}</span>
+            </div>
+          </div>
+
+          {reviewsList.length === 0 ? (
+            <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay opiniones publicadas todavía para esta actividad. Los participantes podrán opinar una vez que finalice la fecha de inicio.</p>
+          ) : (
+            <div class="grid grid-cols-1 gap-4">
+              {reviewsList.map((rev) => (
+                <ReviewCard review={rev} />
+              ))}
+            </div>
+          )}
+
+          {/* Form to leave a review (if has attended & logged in) */}
+          {currentUser && hasAttended && (
+            <div class="rounded-2xl border border-zinc-100 p-6 bg-emerald-50/20">
+              <h3 class="text-base font-bold text-zinc-950 mb-2">Dejanos tu opinión</h3>
+              <p class="text-xs text-zinc-500 mb-4">Ayudanos a generar más confianza e incentivar a otras familias a sumarse.</p>
+              <form action="/api/opiniones" method="POST" class="space-y-4">
+                <input type="hidden" name="activityId" value={activity.id} />
+                <div>
+                  <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Calificación</label>
+                  <select name="rating" class="rounded-xl border border-zinc-200 bg-white p-2.5 text-sm focus:outline-none focus:border-emerald-600 font-medium">
+                    <option value="5">⭐⭐⭐⭐⭐ (Excelente)</option>
+                    <option value="4">⭐⭐⭐⭐ (Muy Bueno)</option>
+                    <option value="3">⭐⭐⭐ (Bueno)</option>
+                    <option value="2">⭐⭐ (Regular)</option>
+                    <option value="1">⭐ (Malo)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Comentario</label>
+                  <textarea 
+                    name="comment" 
+                    rows="3" 
+                    placeholder="Contanos tu experiencia..."
+                    class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"
+                    required
+                  ></textarea>
+                </div>
+                <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                  Enviar opinión
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      <!-- Right Column: Inscription Widget Card (Sticky) -->
+      <div class="lg:col-span-4">
+        <div class="sticky top-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-xl shadow-zinc-100/50 space-y-6">
+          <div class="flex items-center justify-between border-b border-zinc-100 pb-4">
+            <div>
+              <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider">Costo</p>
+              <p class="text-2xl font-black text-zinc-950">{parseFloat(activity.price) === 0 ? 'Gratis' : `$${activity.price}`}</p>
+            </div>
+            
+            <button 
+              type="button"
+              class={`rounded-full p-2 border transition-all ${isBookmarked ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-zinc-50 border-zinc-200 text-zinc-400 hover:text-rose-500'}`}
+              onclick={`alert("Actividad guardada en tus favoritos.")`}
+            >
+              <Heart class={`h-5 w-5 ${isBookmarked ? 'fill-rose-500' : ''}`} />
+            </button>
+          </div>
+
+          <!-- Capacity & spots remaining details -->
+          <div class="space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-zinc-500 font-medium">Lugares totales</span>
+              <span class="font-bold text-zinc-900">{activity.capacity}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-zinc-500 font-medium">Registrados</span>
+              <span class="font-bold text-zinc-900">{activity.confirmedRegistrations}</span>
+            </div>
+            <div class="flex justify-between text-sm pt-2 border-t border-zinc-50">
+              <span class="text-zinc-500 font-medium">Disponibles</span>
+              {isSoldOut ? (
+                <span class="font-bold text-rose-600">Cupos completos</span>
+              ) : (
+                <span class="font-bold text-emerald-600">{spotsLeft} lugares</span>
+              )}
+            </div>
+          </div>
+
+          <!-- Registration options details -->
+          <div class="rounded-xl bg-zinc-50 p-4 space-y-2">
+            <p class="text-xs font-bold text-zinc-700">Tipo de Inscripción</p>
+            <p class="text-xs text-zinc-500 leading-relaxed">
+              {activity.registrationType === 'open' && 'Inscripción automática e inmediata en un solo click.'}
+              {activity.registrationType === 'approval_required' && 'Inscripción sujeta a revisión del organizador. Recibirás confirmación por email.'}
+              {activity.registrationType === 'external' && 'El organizador gestiona las vacantes mediante un sitio externo.'}
+            </p>
+          </div>
+
+          <!-- Button Actions for Inscriptions -->
+          {isRegistered ? (
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 rounded-xl bg-emerald-50 text-emerald-800 p-3 text-sm font-semibold justify-center">
+                <CheckCircle2 class="h-4 w-4 text-emerald-600" />
+                ¡Estás anotado!
+              </div>
+              <button 
+                type="button" 
+                class="w-full items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98]"
+                onclick={`alert("Tu inscripción ha sido cancelada exitosamente.")`}
+              >
+                Cancelar inscripción
+              </button>
+            </div>
+          ) : (
+            <>
+              {activity.registrationType === 'external' ? (
+                <a 
+                  href={activity.externalUrl || '#'} 
+                  target="_blank" 
+                  class="flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all text-center"
+                >
+                  Registrarse en sitio externo &rarr;
+                </a>
+              ) : (
+                <button 
+                  type="button"
+                  disabled={isSoldOut}
+                  class={`w-full flex items-center justify-center rounded-2xl py-3.5 text-sm font-bold text-white shadow-md transition-all ${isSoldOut ? 'bg-zinc-300 shadow-none cursor-not-allowed' : 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.01] active:scale-[0.99]'}`}
+                  onclick={currentUser ? `alert("¡Felicitaciones! Te inscribiste con éxito en esta actividad. Recibirás un recordatorio antes de iniciar.")` : `window.location.href='/login'`}
+                >
+                  {isSoldOut ? 'Cupos completos' : 'Registrarme ahora'}
+                </button>
+              )}
+            </>
+          )}
+
+          {activity.status === 'cancelled' && (
+            <div class="rounded-xl bg-rose-50 text-rose-800 p-3 text-xs font-semibold text-center">
+              ⚠️ Esta actividad ha sido cancelada por los organizadores.
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Similar Activities Section -->
+    {filteredSimilar.length > 0 && (
+      <div class="mt-20 pt-10 border-t border-zinc-100">
+        <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl mb-8">
+          Actividades similares que pueden interesarte
+        </h2>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredSimilar.map((act) => (
+            <ActivityCard activity={act} />
+          ))}
+        </div>
+      </div>
+    )}
+
+  </div>
+</Layout>

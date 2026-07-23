@@ -1,0 +1,591 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { db } from '../../../lib/db/client';
+import { organizations, organizationStats, organizationMembers } from '../../../lib/db/schema';
+import { organizationRepository } from '../../../lib/repositories/organizationRepository';
+import { activityRepository } from '../../../lib/repositories/activityRepository';
+import { Building2, PlusCircle, CheckCircle2, Users, Star, BarChart3, Settings, ShieldAlert, Award, FileText } from 'lucide-astro';
+import { eq, isNull } from 'drizzle-orm';
+
+const currentUser = Astro.locals.user;
+
+if (!currentUser || (currentUser.role !== 'organizer' && currentUser.role !== 'admin')) {
+  return Astro.redirect('/login');
+}
+
+// 1. Fetch user's organizations
+const userOrgs = await organizationRepository.getUserOrganizations(currentUser.id);
+const hasOrg = userOrgs.length > 0;
+const org = hasOrg ? userOrgs[0] : null;
+
+// 2. Fetch data if organization exists
+let orgActivitiesList: any[] = [];
+let pendingInscriptionsList: any[] = [];
+let orgStats: any = null;
+
+if (org) {
+  // Fetch activities
+  orgActivitiesList = await activityRepository.list({
+    organizationId: org.id,
+    status: 'published', // we fetch published
+  });
+  
+  // also fetch drafts
+  try {
+    const drafts = await activityRepository.list({
+      organizationId: org.id,
+      status: 'draft',
+    });
+    orgActivitiesList = [...drafts, ...orgActivitiesList];
+  } catch(e) {}
+
+  // Fetch stats
+  orgStats = await organizationRepository.getStats(org.id);
+
+  // Fetch inscriptions for all org activities to show in attendees management
+  for (const act of orgActivitiesList) {
+    const ins = await activityRepository.getInscriptions(act.id);
+    pendingInscriptionsList.push(...ins.map(i => ({ ...i, activityTitle: act.title })));
+  }
+}
+
+// Handle POST actions: Organization Registration or Updates
+let successMsg = '';
+let errorMsg = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get('action');
+
+    if (action === 'create_org') {
+      const name = formData.get('name') as string;
+      const description = formData.get('description') as string;
+      const mission = formData.get('mission') as string;
+      const type = formData.get('type') as string;
+      const email = formData.get('email') as string;
+      const phone = formData.get('phone') as string;
+      const whatsapp = formData.get('whatsapp') as string;
+      const contactPerson = formData.get('contactPerson') as string;
+      const website = formData.get('website') as string;
+      
+      const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      const newOrg = await organizationRepository.create({
+        name,
+        slug,
+        description,
+        mission,
+        type,
+        email,
+        phone,
+        whatsapp,
+        contactPerson,
+        website,
+        logo: null,
+        banner: null,
+        instagram: null,
+        facebook: null,
+        foundedAt: new Date(),
+        verifiedAt: null,
+        verifiedBy: null,
+        verificationLevel: 'none',
+      }, currentUser.id);
+
+      // Refresh page to load org dashboard
+      return Astro.redirect('/dashboard/organizador');
+
+    } else if (action === 'update_org' && org) {
+      const name = formData.get('name') as string;
+      const description = formData.get('description') as string;
+      const mission = formData.get('mission') as string;
+      const website = formData.get('website') as string;
+      const email = formData.get('email') as string;
+      const phone = formData.get('phone') as string;
+      const whatsapp = formData.get('whatsapp') as string;
+      const contactPerson = formData.get('contactPerson') as string;
+
+      await organizationRepository.update(org.id, {
+        name,
+        description,
+        mission,
+        website,
+        email,
+        phone,
+        whatsapp,
+        contactPerson,
+      });
+
+      successMsg = '¡Los datos de la organización se actualizaron correctamente!';
+      
+      // Update values for local render
+      org.name = name;
+      org.description = description;
+      org.mission = mission;
+      org.website = website;
+      org.email = email;
+      org.phone = phone;
+      org.whatsapp = whatsapp;
+      org.contactPerson = contactPerson;
+
+    } else if (action === 'approve_inscription') {
+      const insId = formData.get('inscriptionId') as string;
+      const actId = formData.get('activityId') as string;
+      
+      // Update inscription status to registered/attended
+      await db.update(schema.inscriptions).set({ status: 'registered' }).where(eq(schema.inscriptions.id, insId));
+      successMsg = 'Inscripción aprobada correctamente.';
+      
+      // Refresh
+      return Astro.redirect('/dashboard/organizador');
+    }
+  } catch (err: any) {
+    errorMsg = err.message || 'Error al procesar la solicitud.';
+  }
+}
+
+import * as schema from '../../../lib/db/schema';
+---
+
+<Layout title="Mi Organización | Kindora">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- IF NO ORGANIZATION REGISTERED YET (ONBOARDING FLOW) -->
+    {!hasOrg ? (
+      <div class="max-w-2xl mx-auto space-y-8 py-8">
+        <div class="text-center space-y-2">
+          <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mx-auto mb-4">
+            <Building2 class="h-6 w-6" />
+          </span>
+          <h1 class="text-3xl font-black tracking-tight text-zinc-900 font-sans">Registrá tu Organización</h1>
+          <p class="text-sm text-zinc-500 max-w-md mx-auto">
+            Completá los datos de tu fundación, ONG o grupo para empezar a publicar actividades con impacto positivo.
+          </p>
+        </div>
+
+        <form method="POST" class="bg-white border border-zinc-200/80 rounded-3xl p-6 sm:p-8 shadow-xl shadow-zinc-100/50 space-y-6">
+          <input type="hidden" name="action" value="create_org" />
+
+          {errorMsg && (
+            <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold">
+              ⚠️ {errorMsg}
+            </div>
+          )}
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="sm:col-span-2">
+              <label for="org-name" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nombre de la organización</label>
+              <input type="text" id="org-name" name="name" placeholder="ej: Fundación Huerta Orgánica" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
+
+            <div>
+              <label for="org-type" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Tipo de entidad</label>
+              <select id="org-type" name="type" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
+                <option value="NGO">ONG / Asociación Civil</option>
+                <option value="Foundation">Fundación</option>
+                <option value="Community Group">Grupo Comunitario</option>
+                <option value="Municipality">Municipio / Gobierno</option>
+                <option value="School">Escuela / Universidad</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="org-contact" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Persona de contacto</label>
+              <input type="text" id="org-contact" name="contactPerson" placeholder="Nombre completo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
+
+            <div class="sm:col-span-2">
+              <label for="org-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descripción (Qué hacen)</label>
+              <textarea id="org-desc" name="description" rows="3" placeholder="Contanos brevemente qué hace tu organización..." class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required></textarea>
+            </div>
+
+            <div class="sm:col-span-2">
+              <label for="org-mission" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Misión / Lema</label>
+              <input type="text" id="org-mission" name="mission" placeholder="Frase que resuma su propósito principal" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+
+            <div>
+              <label for="org-email" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email público de contacto</label>
+              <input type="email" id="org-email" name="email" placeholder="hola@organizacion.org" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
+
+            <div>
+              <label for="org-phone" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Teléfono de contacto</label>
+              <input type="tel" id="org-phone" name="phone" placeholder="ej: +54 9 11 5555-5555" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+
+            <div>
+              <label for="org-whatsapp" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">WhatsApp de consultas</label>
+              <input type="tel" id="org-whatsapp" name="whatsapp" placeholder="ej: +5491155555555" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+
+            <div>
+              <label for="org-web" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Sitio Web (opcional)</label>
+              <input type="url" id="org-web" name="website" placeholder="https://miorganizacion.org" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+          </div>
+
+          <button type="submit" class="w-full flex items-center justify-center rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all">
+            Registrar Organización
+          </button>
+        </form>
+      </div>
+    ) : (
+      <>
+        <!-- Header Banner with stats -->
+        <div class="rounded-3xl border border-zinc-100 bg-zinc-50/50 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div class="flex items-center gap-4">
+            <img 
+              src={org.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${org.name}`} 
+              alt={org.name} 
+              class="h-16 w-16 md:h-20 md:w-20 rounded-2xl object-cover border-2 border-white shadow-md"
+            />
+            <div>
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="inline-flex rounded bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase tracking-wider">Organizador</span>
+                {org.verificationLevel !== 'none' && (
+                  <span class="inline-flex items-center gap-0.5 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                    <CheckCircle2 class="h-3 w-3 fill-emerald-500 text-white" />
+                    Verificado
+                  </span>
+                )}
+              </div>
+              <h1 class="text-2xl font-black text-zinc-950 tracking-tight leading-none mb-1">{org.name}</h1>
+              <a href={`/organizacion/${org.slug}`} target="_blank" class="text-xs font-semibold text-emerald-600 hover:underline">Ver perfil público &rarr;</a>
+            </div>
+          </div>
+
+          <!-- Quick stats overview -->
+          <div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-zinc-500">
+            <div class="bg-white border border-zinc-100 rounded-xl px-4 py-2.5 text-center shadow-sm">
+              <span class="block text-lg font-black text-zinc-900 leading-none mb-1">{orgStats?.followers || 0}</span>
+              <span>Seguidores</span>
+            </div>
+            <div class="bg-white border border-zinc-100 rounded-xl px-4 py-2.5 text-center shadow-sm">
+              <span class="block text-lg font-black text-zinc-900 leading-none mb-1">{orgActivitiesList.length}</span>
+              <span>Actividades</span>
+            </div>
+            <div class="bg-white border border-zinc-100 rounded-xl px-4 py-2.5 text-center shadow-sm flex items-center gap-1.5">
+              <div>
+                <span class="block text-lg font-black text-zinc-900 leading-none mb-1">{orgStats?.rating || '0.00'}</span>
+                <span>Calificación</span>
+              </div>
+              <Star class="h-5 w-5 fill-amber-400 text-amber-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Verification Status Alert box */}
+        {org.verificationLevel === 'none' && (
+          <div class="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex gap-3 text-sm text-amber-800">
+              <ShieldAlert class="h-5 w-5 text-amber-600 flex-shrink-0" />
+              <div>
+                <h4 class="font-bold">Tu cuenta aún no está verificada</h4>
+                <p class="text-xs text-amber-700 mt-0.5">Para poder publicar actividades visibles para toda la comunidad, tenés que completar tu proceso de verificación.</p>
+              </div>
+            </div>
+            <a href="/dashboard/organizador/verificar" class="rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm flex-shrink-0 transition-colors">
+              Completar verificación
+            </a>
+          </div>
+        )}
+
+        <!-- Main Dashboard grid -->
+        <div class="grid grid-cols-1 gap-8 lg:grid-cols-4">
+          
+          <!-- Sidebar Navigation -->
+          <aside class="lg:col-span-1 border border-zinc-100 rounded-2xl p-4 bg-zinc-50/30 self-start">
+            <nav class="flex flex-col gap-1.5" id="dashboard-tabs">
+              <button type="button" class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left bg-emerald-50 text-emerald-700 transition-all" data-tab="actividades">
+                <FileText class="h-4.5 w-4.5" />
+                Actividades
+              </button>
+              <button type="button" class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all justify-between" data-tab="participantes">
+                <span class="flex items-center gap-2.5">
+                  <Users class="h-4.5 w-4.5" />
+                  Participantes
+                </span>
+              </button>
+              <button type="button" class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all" data-tab="estadisticas">
+                <BarChart3 class="h-4.5 w-4.5" />
+                Estadísticas
+              </button>
+              <button type="button" class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold rounded-xl text-left text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 transition-all" data-tab="configuracion">
+                <Settings class="h-4.5 w-4.5" />
+                Configuración
+              </button>
+            </nav>
+          </aside>
+
+          <!-- Content display area -->
+          <div class="lg:col-span-3 space-y-6">
+            
+            {successMsg && (
+              <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800 font-semibold shadow-sm">
+                {successMsg}
+              </div>
+            )}
+            {errorMsg && (
+              <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold shadow-sm">
+                {errorMsg}
+              </div>
+            )}
+
+            <!-- Tab Content: Actividades -->
+            <section id="tab-content-actividades" class="space-y-6 block">
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-zinc-950">Actividades creadas</h2>
+                <a href="/dashboard/organizador/crear" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all">
+                  <PlusCircle class="h-4 w-4" />
+                  Nueva actividad
+                </a>
+              </div>
+
+              {orgActivitiesList.length === 0 ? (
+                <div class="flex flex-col items-center justify-center text-center p-12 border border-dashed border-zinc-200 rounded-2xl bg-zinc-50/20">
+                  <span class="text-3xl mb-3">📅</span>
+                  <h3 class="text-sm font-bold text-zinc-800">No tenés actividades creadas</h3>
+                  <p class="text-xs text-zinc-500 max-w-xs mt-0.5">Comenzá a publicar talleres o voluntariados para conectar con vecinos.</p>
+                  <a href="/dashboard/organizador/crear" class="mt-4 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                    Crear mi primera actividad
+                  </a>
+                </div>
+              ) : (
+                <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+                  <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-left text-sm text-zinc-500">
+                      <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-200">
+                        <tr>
+                          <th scope="col" class="px-6 py-4">Actividad</th>
+                          <th scope="col" class="px-6 py-4">Fecha</th>
+                          <th scope="col" class="px-6 py-4">Inscriptos</th>
+                          <th scope="col" class="px-6 py-4">Estado</th>
+                          <th scope="col" class="px-6 py-4">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200">
+                        {orgActivitiesList.map((act) => {
+                          const spotsFilled = act.confirmedRegistrations;
+                          const spotsText = `${spotsFilled} / ${act.capacity}`;
+                          return (
+                            <tr class="hover:bg-zinc-50/50 transition-colors">
+                              <td class="px-6 py-4 font-bold text-zinc-900">
+                                <a href={`/actividad/${act.id}-${act.slug}`} class="hover:text-emerald-600 transition-colors">
+                                  {act.title}
+                                </a>
+                              </td>
+                              <td class="px-6 py-4 text-xs">
+                                {new Date(act.startsAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                              </td>
+                              <td class="px-6 py-4 text-xs font-medium">
+                                {spotsText}
+                              </td>
+                              <td class="px-6 py-4">
+                                <span class={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${
+                                  act.status === 'published' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' :
+                                  act.status === 'draft' ? 'bg-zinc-100 border-zinc-200 text-zinc-800' :
+                                  act.status === 'completed' ? 'bg-blue-50 border-blue-100 text-blue-800' :
+                                  'bg-rose-50 border-rose-100 text-rose-800'
+                                }`}>
+                                  {act.status === 'published' ? 'Publicada' :
+                                   act.status === 'draft' ? 'Borrador' :
+                                   act.status === 'completed' ? 'Finalizada' :
+                                   'Cancelada'}
+                                </span>
+                              </td>
+                              <td class="px-6 py-4 text-xs font-semibold">
+                                <a href={`/dashboard/organizador/crear?id=${act.id}`} class="text-emerald-600 hover:text-emerald-700">Editar</a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <!-- Tab Content: Participantes (Attendee Management) -->
+            <section id="tab-content-participantes" class="space-y-6 hidden">
+              <h2 class="text-xl font-bold text-zinc-950">Inscripciones y asistentes</h2>
+              
+              {pendingInscriptionsList.length === 0 ? (
+                <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay inscriptos registrados en tus actividades por el momento.</p>
+              ) : (
+                <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+                  <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-left text-sm text-zinc-500">
+                      <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-200">
+                        <tr>
+                          <th class="px-6 py-4">Participante</th>
+                          <th class="px-6 py-4">Actividad</th>
+                          <th class="px-6 py-4">Fecha Registro</th>
+                          <th class="px-6 py-4">Estado</th>
+                          <th class="px-6 py-4">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-200">
+                        {pendingInscriptionsList.map((ins) => (
+                          <tr class="hover:bg-zinc-50/50 transition-colors">
+                            <td class="px-6 py-4">
+                              <span class="block font-bold text-zinc-900">{ins.user?.name}</span>
+                              <span class="block text-[10px] text-zinc-400">{ins.user?.email}</span>
+                            </td>
+                            <td class="px-6 py-4 text-xs font-medium">
+                              {ins.activityTitle}
+                            </td>
+                            <td class="px-6 py-4 text-xs">
+                              {new Date(ins.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                            </td>
+                            <td class="px-6 py-4 text-xs">
+                              <span class={`inline-flex rounded px-1.5 py-0.5 font-bold ${
+                                ins.status === 'registered' ? 'bg-emerald-50 text-emerald-700' :
+                                ins.status === 'attended' ? 'bg-blue-50 text-blue-700' :
+                                'bg-rose-50 text-rose-700'
+                              }`}>
+                                {ins.status === 'registered' ? 'Anotado' : ins.status === 'attended' ? 'Asistió' : 'Cancelado'}
+                              </span>
+                            </td>
+                            <td class="px-6 py-4">
+                              {ins.status === 'registered' && (
+                                <form method="POST" class="m-0">
+                                  <input type="hidden" name="action" value="approve_inscription" />
+                                  <input type="hidden" name="inscriptionId" value={ins.id} />
+                                  <input type="hidden" name="activityId" value={ins.activityId} />
+                                  <button type="submit" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                                    Registrar Asistencia
+                                  </button>
+                                </form>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <!-- Tab Content: Estadísticas -->
+            <section id="tab-content-estadisticas" class="space-y-6 hidden">
+              <h2 class="text-xl font-bold text-zinc-950 font-sans">Estadísticas de impacto</h2>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- Views widget -->
+                <div class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
+                  <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Visualizaciones Totales</span>
+                  <span class="text-3xl font-black text-zinc-900 block">{orgStats?.views || 0}</span>
+                  <p class="text-[10px] text-emerald-600 font-medium">📈 +12% de incremento mensual</p>
+                </div>
+                <!-- conversion widget -->
+                <div class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
+                  <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Tasa de Conversión</span>
+                  <span class="text-3xl font-black text-zinc-900 block">34.8%</span>
+                  <p class="text-[10px] text-zinc-400">Visitas vs Inscripciones confirmadas</p>
+                </div>
+                <!-- review count -->
+                <div class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
+                  <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Reseñas recibidas</span>
+                  <span class="text-3xl font-black text-zinc-900 block">{orgStats?.reviewsCount || 0}</span>
+                  <p class="text-[10px] text-amber-600 font-medium">★ Calificación: {orgStats?.rating || '0.00'}</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Tab Content: Configuración -->
+            <section id="tab-content-configuracion" class="space-y-6 hidden">
+              <div class="space-y-1">
+                <h2 class="text-xl font-bold text-zinc-950 font-sans">Configuración de la Organización</h2>
+                <p class="text-xs text-zinc-500">Mantené actualizados los datos visibles en tu perfil público.</p>
+              </div>
+
+              <form method="POST" class="space-y-4 max-w-2xl">
+                <input type="hidden" name="action" value="update_org" />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div class="sm:col-span-2">
+                    <label for="conf-name" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nombre completo</label>
+                    <input type="text" id="conf-name" name="name" value={org.name} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+                  </div>
+
+                  <div class="sm:col-span-2">
+                    <label for="conf-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descripción pública</label>
+                    <textarea id="conf-desc" name="description" rows="3" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>{org.description}</textarea>
+                  </div>
+
+                  <div class="sm:col-span-2">
+                    <label for="conf-mission" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Misión / Propósito</label>
+                    <input type="text" id="conf-mission" name="mission" value={org.mission || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+                  </div>
+
+                  <div>
+                    <label for="conf-contact" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Persona de contacto</label>
+                    <input type="text" id="conf-contact" name="contactPerson" value={org.contactPerson || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+                  </div>
+
+                  <div>
+                    <label for="conf-web" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Sitio Web</label>
+                    <input type="url" id="conf-web" name="website" value={org.website || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+                  </div>
+
+                  <div>
+                    <label for="conf-email" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Email de consultas</label>
+                    <input type="email" id="conf-email" name="email" value={org.email || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+                  </div>
+
+                  <div>
+                    <label for="conf-phone" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Teléfono fijo/celular</label>
+                    <input type="tel" id="conf-phone" name="phone" value={org.phone || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+                  </div>
+
+                  <div>
+                    <label for="conf-whatsapp" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">WhatsApp de consultas</label>
+                    <input type="tel" id="conf-whatsapp" name="whatsapp" value={org.whatsapp || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+                  </div>
+                </div>
+
+                <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
+                  Guardar configuración
+                </button>
+              </form>
+            </section>
+
+          </div>
+        </div>
+      </>
+    )}
+
+  </div>
+</Layout>
+
+<script>
+  // Client tab toggler
+  const tabs = document.querySelectorAll('#dashboard-tabs button');
+  const sections = document.querySelectorAll('section[id^="tab-content-"]');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.getAttribute('data-tab');
+      
+      tabs.forEach(t => {
+        t.classList.remove('bg-emerald-50', 'text-emerald-700');
+        t.classList.add('text-zinc-600', 'hover:bg-zinc-50');
+      });
+      tab.classList.remove('text-zinc-600', 'hover:bg-zinc-50');
+      tab.classList.add('bg-emerald-50', 'text-emerald-700');
+
+      sections.forEach(sec => {
+        if (sec.id === `tab-content-${target}`) {
+          sec.classList.remove('hidden');
+          sec.classList.add('block');
+        } else {
+          sec.classList.remove('block');
+          sec.classList.add('hidden');
+        }
+      });
+    });
+  });
+</script>

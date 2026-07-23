@@ -1,0 +1,554 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { db } from '../../../lib/db/client';
+import { activityRepository } from '../../../lib/repositories/activityRepository';
+import { organizationRepository } from '../../../lib/repositories/organizationRepository';
+import { ArrowLeft, PlusCircle, Check, Info } from 'lucide-astro';
+
+const currentUser = Astro.locals.user;
+
+if (!currentUser || (currentUser.role !== 'organizer' && currentUser.role !== 'admin')) {
+  return Astro.redirect('/login');
+}
+
+// Fetch user organization
+const userOrgs = await organizationRepository.getUserOrganizations(currentUser.id);
+if (userOrgs.length === 0) {
+  return Astro.redirect('/dashboard/organizador'); // Must create organization first
+}
+const org = userOrgs[0];
+
+// Fetch categories, accessibility features & tags
+const categoriesList = await activityRepository.getCategories();
+const accessibilityList = await activityRepository.getAccessibilityFeatures();
+const tagsList = await activityRepository.getTags();
+
+// Check if editing an existing activity
+const editId = Astro.url.searchParams.get('id');
+let activityToEdit: any = null;
+if (editId) {
+  activityToEdit = await activityRepository.findById(editId);
+  // Ensure organizer owns this activity
+  if (activityToEdit && activityToEdit.organizationId !== org.id) {
+    return Astro.redirect('/dashboard/organizador');
+  }
+}
+
+let errorMsg = '';
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    
+    // Parse fields
+    const title = formData.get('title') as string;
+    const categoryId = formData.get('categoryId') as string;
+    const description = formData.get('description') as string;
+    
+    const startsAtVal = formData.get('startsAt') as string;
+    const endsAtVal = formData.get('endsAt') as string;
+    const timezone = formData.get('timezone') as string || 'America/Argentina/Buenos_Aires';
+    
+    const capacity = parseInt(formData.get('capacity') as string, 10);
+    const price = formData.get('price') as string || '0.00';
+    
+    const registrationType = formData.get('registrationType') as string;
+    const externalUrl = formData.get('externalUrl') as string || null;
+    const visibility = formData.get('visibility') as string;
+    
+    const contactName = formData.get('contactName') as string || null;
+    const contactEmail = formData.get('contactEmail') as string || null;
+    const contactPhone = formData.get('contactPhone') as string || null;
+    
+    // Location details
+    const address = formData.get('address') as string;
+    const city = formData.get('city') as string;
+    const province = formData.get('province') as string;
+    const latitude = parseFloat(formData.get('latitude') as string || '-34.6037');
+    const longitude = parseFloat(formData.get('longitude') as string || '-58.3816');
+
+    // Accessibility features selected
+    const selectedA11y = formData.getAll('accessibility') as string[];
+    // Tags selected
+    const selectedTags = formData.getAll('tags') as string[];
+
+    const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    // Status: if org is verified, auto-publish, else set to draft/pending_review
+    const status = org.verificationLevel !== 'none' ? 'published' : 'pending_review';
+
+    if (editId && activityToEdit) {
+      // Update
+      await activityRepository.update(
+        editId,
+        {
+          title,
+          categoryId,
+          description,
+          slug,
+          startsAt: new Date(startsAtVal),
+          endsAt: new Date(endsAtVal),
+          timezone,
+          capacity,
+          price,
+          registrationType,
+          externalUrl,
+          visibility,
+          contactName,
+          contactEmail,
+          contactPhone,
+          status: activityToEdit.status, // keep existing status
+        },
+        {
+          address,
+          city,
+          province,
+          country: 'Argentina',
+          latitude,
+          longitude,
+        },
+        selectedTags,
+        selectedA11y
+      );
+    } else {
+      // Create new
+      await activityRepository.create(
+        {
+          organizationId: org.id,
+          categoryId,
+          title,
+          slug,
+          description,
+          startsAt: new Date(startsAtVal),
+          endsAt: new Date(endsAtVal),
+          timezone,
+          capacity,
+          price,
+          registrationType,
+          externalUrl,
+          visibility,
+          contactName,
+          contactEmail,
+          contactPhone,
+          status,
+        },
+        {
+          address,
+          city,
+          province,
+          country: 'Argentina',
+          latitude,
+          longitude,
+        },
+        selectedTags,
+        selectedA11y,
+        // Mock default cover image
+        [{ url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800', order: 1, isCover: true }]
+      );
+    }
+
+    return Astro.redirect('/dashboard/organizador');
+  } catch (err: any) {
+    errorMsg = err.message || 'Error al guardar la actividad.';
+  }
+}
+---
+
+<Layout title={activityToEdit ? 'Editar Actividad | Kindora' : 'Crear Actividad | Kindora'}>
+  <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- Top Nav -->
+    <a href="/dashboard/organizador" class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-500 hover:text-emerald-600 transition-colors mb-6">
+      <ArrowLeft class="h-4 w-4" />
+      Volver al panel
+    </a>
+
+    <!-- Page Title -->
+    <div class="space-y-2 mb-8">
+      <h1 class="text-3xl font-black tracking-tight text-zinc-950 font-sans">
+        {activityToEdit ? 'Editar Actividad' : 'Crear una Actividad'}
+      </h1>
+      <p class="text-sm text-zinc-500">
+        Completá los detalles de la actividad para que la comunidad pueda descubrirla.
+      </p>
+    </div>
+
+    <!-- Wizard Steps Indicator -->
+    <div class="grid grid-cols-5 gap-2 mb-8 text-center text-xs font-bold text-zinc-400">
+      <div id="step-ind-1" class="border-b-4 border-emerald-600 pb-2 text-emerald-700">1. Info Básica</div>
+      <div id="step-ind-2" class="border-b-4 border-zinc-200 pb-2">2. Horarios</div>
+      <div id="step-ind-3" class="border-b-4 border-zinc-200 pb-2">3. Ubicación</div>
+      <div id="step-ind-4" class="border-b-4 border-zinc-200 pb-2">4. A11y & Contacto</div>
+      <div id="step-ind-5" class="border-b-4 border-zinc-200 pb-2">5. Registro</div>
+    </div>
+
+    <form method="POST" class="bg-white border border-zinc-200/80 rounded-3xl p-6 sm:p-8 shadow-xl shadow-zinc-100/50 space-y-6" id="wizard-form">
+      
+      {errorMsg && (
+        <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-semibold">
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
+      <!-- STEP 1: INFORMACION BASICA -->
+      <div id="step-section-1" class="space-y-5 block">
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Información Básica</h3>
+        
+        <div>
+          <label for="act-title" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Título de la actividad</label>
+          <input type="text" id="act-title" name="title" value={activityToEdit?.title || ''} placeholder="ej: Picnic inclusivo de integración" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+        </div>
+
+        <div>
+          <label for="act-cat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Categoría principal</label>
+          <select id="act-cat" name="categoryId" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
+            {categoriesList.map((cat) => (
+              <option value={cat.id} selected={activityToEdit?.categoryId === cat.id}>{cat.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label for="act-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descripción detallada</label>
+          <textarea id="act-desc" name="description" rows="5" placeholder="Describí en detalle en qué consiste la actividad, qué harán, qué deben llevar, etc." class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>{activityToEdit?.description || ''}</textarea>
+        </div>
+
+        <!-- Tags Selection -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Etiquetas relacionadas</label>
+          <div class="flex flex-wrap gap-2.5">
+            {tagsList.map((tag) => (
+              <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 hover:border-emerald-200 cursor-pointer text-xs font-semibold text-zinc-600 hover:text-emerald-700 hover:bg-emerald-50/10">
+                <input 
+                  type="checkbox" 
+                  name="tags" 
+                  value={tag.id}
+                  checked={activityToEdit?.tags?.some((t: any) => t.id === tag.id)}
+                  class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5" 
+                />
+                <span>{tag.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: HORARIOS Y CAPACIDAD -->
+      <div id="step-section-2" class="space-y-5 hidden">
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Fechas, Horarios y Capacidad</h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="act-starts" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Fecha y hora de Inicio</label>
+            <input 
+              type="datetime-local" 
+              id="act-starts" 
+              name="startsAt" 
+              value={activityToEdit?.startsAt ? new Date(activityToEdit.startsAt).toISOString().slice(0, 16) : ''}
+              class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+              required 
+            />
+          </div>
+
+          <div>
+            <label for="act-ends" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Fecha y hora de Finalización</label>
+            <input 
+              type="datetime-local" 
+              id="act-ends" 
+              name="endsAt" 
+              value={activityToEdit?.endsAt ? new Date(activityToEdit.endsAt).toISOString().slice(0, 16) : ''}
+              class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+              required 
+            />
+          </div>
+
+          <div>
+            <label for="act-capacity" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Capacidad máxima (cupos)</label>
+            <input type="number" id="act-capacity" name="capacity" value={activityToEdit?.capacity || ''} placeholder="ej: 25" min="1" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+
+          <div>
+            <label for="act-price" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Costo (ARS)</label>
+            <input type="number" id="act-price" name="price" value={activityToEdit?.price || '0.00'} placeholder="0.00 para gratis" min="0" step="0.01" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: UBICACION -->
+      <div id="step-section-3" class="space-y-5 hidden">
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Ubicación del Encuentro</h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2">
+            <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Dirección (Calle y altura)</label>
+            <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+
+          <div>
+            <label for="act-city" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ciudad / Barrio</label>
+            <input type="text" id="act-city" name="city" value={activityToEdit?.location?.city || ''} placeholder="ej: Tigre o Palermo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+
+          <div>
+            <label for="act-prov" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Provincia</label>
+            <input type="text" id="act-prov" name="province" value={activityToEdit?.location?.province || ''} placeholder="ej: Buenos Aires" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+
+          <!-- Mock coordinates for Leaflet map mapping -->
+          <div>
+            <label for="act-lat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Latitud (Coordenadas)</label>
+            <input type="number" step="any" id="act-lat" name="latitude" value={activityToEdit?.location?.latitude || -34.6037} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+
+          <div>
+            <label for="act-lng" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Longitud (Coordenadas)</label>
+            <input type="number" step="any" id="act-lng" name="longitude" value={activityToEdit?.location?.longitude || -58.3816} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: ACCESIBILIDAD Y CONTACTO -->
+      <div id="step-section-4" class="space-y-5 hidden">
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Accesibilidad y Contacto de Coordinación</h3>
+
+        <!-- Accessibility features list -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Facilidades de Accesibilidad disponibles</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {accessibilityList.map((a11y) => (
+              <label class="flex items-center gap-3 border border-zinc-150 rounded-xl p-3 bg-white hover:border-emerald-250 hover:bg-emerald-50/5 cursor-pointer text-sm font-semibold text-zinc-700">
+                <input 
+                  type="checkbox" 
+                  name="accessibility" 
+                  value={a11y.id}
+                  checked={activityToEdit?.accessibility?.some((a: any) => a.id === a11y.id)}
+                  class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5"
+                />
+                <span>{a11y.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <!-- Coordinator Contact Details -->
+        <div class="pt-4 border-t border-zinc-100 space-y-4">
+          <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Coordinador/a directo/a de esta actividad</label>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label for="act-contact-name" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Nombre</label>
+              <input type="text" id="act-contact-name" name="contactName" value={activityToEdit?.contactName || ''} placeholder="Nombre completo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+
+            <div>
+              <label for="act-contact-email" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Correo</label>
+              <input type="email" id="act-contact-email" name="contactEmail" value={activityToEdit?.contactEmail || ''} placeholder="correo@ejemplo.com" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+
+            <div>
+              <label for="act-contact-phone" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Teléfono</label>
+              <input type="tel" id="act-contact-phone" name="contactPhone" value={activityToEdit?.contactPhone || ''} placeholder="+54 9 11 5555 5555" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 5: REGISTRO Y VISIBILIDAD -->
+      <div id="step-section-5" class="space-y-5 hidden">
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Configuración de Registro y Visibilidad</h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="act-reg-type" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Método de Inscripción</label>
+            <select id="act-reg-type" name="registrationType" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
+              <option value="open" selected={activityToEdit?.registrationType === 'open'}>Abierta (Inscripción directa)</option>
+              <option value="approval_required" selected={activityToEdit?.registrationType === 'approval_required'}>Requiere aprobación (Revisión manual)</option>
+              <option value="external" selected={activityToEdit?.registrationType === 'external'}>Sitio Externo (Redirección)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="act-vis" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Visibilidad de la actividad</label>
+            <select id="act-vis" name="visibility" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
+              <option value="public" selected={activityToEdit?.visibility === 'public'}>Pública (Visible en listas y buscadores)</option>
+              <option value="unlisted" selected={activityToEdit?.visibility === 'unlisted'}>Oculta (Solo acceso mediante link)</option>
+              <option value="private" selected={activityToEdit?.visibility === 'private'}>Privada (Restringida a miembros)</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-2 hidden" id="ext-url-container">
+            <label for="act-ext-url" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Enlace de Registro Externo</label>
+            <input type="url" id="act-ext-url" name="externalUrl" value={activityToEdit?.externalUrl || ''} placeholder="https://eventbrite.com/mi-evento" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+          </div>
+        </div>
+
+        {org.verificationLevel === 'none' && (
+          <div class="rounded-xl border border-amber-200 bg-amber-50/50 p-4 text-xs text-amber-800 flex items-start gap-2.5">
+            <Info class="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p>
+              <strong>Nota:</strong> Como tu organización aún no ha sido verificada, la actividad se creará en estado <strong>Pendiente de revisión</strong> y requerirá aprobación del administrador antes de aparecer públicamente.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <!-- Action Buttons Navigation -->
+      <div class="flex items-center justify-between border-t border-zinc-100 pt-6 mt-6">
+        <button 
+          type="button" 
+          id="btn-prev" 
+          class="hidden items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 px-5 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98]"
+        >
+          Anterior
+        </button>
+        <button 
+          type="button" 
+          id="btn-next" 
+          class="ml-auto inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+        >
+          Siguiente
+        </button>
+        <button 
+          type="submit" 
+          id="btn-submit" 
+          class="hidden inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+        >
+          {activityToEdit ? 'Guardar Cambios' : 'Publicar Actividad'}
+        </button>
+      </div>
+
+    </form>
+  </div>
+</Layout>
+
+<script>
+  let currentStep = 1;
+  const maxSteps = 5;
+
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  const btnSubmit = document.getElementById('btn-submit');
+  
+  const form = document.getElementById('wizard-form') as HTMLFormElement;
+  const registrationTypeSelect = document.getElementById('act-reg-type') as HTMLSelectElement;
+  const extUrlContainer = document.getElementById('ext-url-container');
+
+  // Toggle External URL based on registration type selection
+  function checkRegType() {
+    if (!registrationTypeSelect || !extUrlContainer) return;
+    if (registrationTypeSelect.value === 'external') {
+      extUrlContainer.classList.remove('hidden');
+      const input = document.getElementById('act-ext-url') as HTMLInputElement;
+      if (input) input.required = true;
+    } else {
+      extUrlContainer.classList.add('hidden');
+      const input = document.getElementById('act-ext-url') as HTMLInputElement;
+      if (input) input.required = false;
+    }
+  }
+
+  if (registrationTypeSelect) {
+    registrationTypeSelect.addEventListener('change', checkRegType);
+    checkRegType(); // Initial run
+  }
+
+  // Multi-step transitions
+  function updateStep(step: number) {
+    currentStep = step;
+    
+    // Update step sections visibility
+    for (let i = 1; i <= maxSteps; i++) {
+      const section = document.getElementById(`step-section-${i}`);
+      const indicator = document.getElementById(`step-ind-${i}`);
+      
+      if (section) {
+        if (i === step) {
+          section.classList.remove('hidden');
+          section.classList.add('block');
+        } else {
+          section.classList.remove('block');
+          section.classList.add('hidden');
+        }
+      }
+
+      if (indicator) {
+        if (i === step) {
+          indicator.classList.remove('text-zinc-450', 'border-zinc-200');
+          indicator.classList.add('text-emerald-700', 'border-emerald-600');
+        } else if (i < step) {
+          // completed steps
+          indicator.classList.remove('border-zinc-200', 'text-emerald-700', 'border-emerald-600');
+          indicator.classList.add('text-zinc-500', 'border-emerald-500');
+        } else {
+          indicator.classList.remove('text-emerald-700', 'border-emerald-600', 'border-emerald-500', 'text-zinc-500');
+          indicator.classList.add('border-zinc-200');
+        }
+      }
+    }
+
+    // Toggle nav buttons
+    if (btnPrev && btnNext && btnSubmit) {
+      if (step === 1) {
+        btnPrev.classList.remove('inline-flex');
+        btnPrev.classList.add('hidden');
+        
+        btnNext.classList.remove('hidden');
+        btnNext.classList.add('inline-flex');
+        
+        btnSubmit.classList.remove('inline-flex');
+        btnSubmit.classList.add('hidden');
+      } else if (step === maxSteps) {
+        btnPrev.classList.remove('hidden');
+        btnPrev.classList.add('inline-flex');
+        
+        btnNext.classList.remove('inline-flex');
+        btnNext.classList.add('hidden');
+        
+        btnSubmit.classList.remove('hidden');
+        btnSubmit.classList.add('inline-flex');
+      } else {
+        btnPrev.classList.remove('hidden');
+        btnPrev.classList.add('inline-flex');
+        
+        btnNext.classList.remove('hidden');
+        btnNext.classList.add('inline-flex');
+        
+        btnSubmit.classList.remove('inline-flex');
+        btnSubmit.classList.add('hidden');
+      }
+    }
+  }
+
+  // Click listeners
+  if (btnNext) {
+    btnNext.addEventListener('click', () => {
+      // Validate current step fields before proceeding
+      const activeSection = document.getElementById(`step-section-${currentStep}`);
+      if (activeSection) {
+        const inputs = activeSection.querySelectorAll('input[required], select[required], textarea[required]');
+        let stepValid = true;
+        inputs.forEach((input: any) => {
+          if (!input.checkValidity()) {
+            input.reportValidity();
+            stepValid = false;
+          }
+        });
+        if (!stepValid) return;
+      }
+      
+      if (currentStep < maxSteps) {
+        updateStep(currentStep + 1);
+      }
+    });
+  }
+
+  if (btnPrev) {
+    btnPrev.addEventListener('click', () => {
+      if (currentStep > 1) {
+        updateStep(currentStep - 1);
+      }
+    });
+  }
+
+  // Initial step render
+  updateStep(1);
+</script>

@@ -1,0 +1,284 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ActivityCard from '../../components/ActivityCard.astro';
+import ReviewCard from '../../components/ReviewCard.astro';
+import { organizationRepository } from '../../lib/repositories/organizationRepository';
+import { activityRepository } from '../../lib/repositories/activityRepository';
+import { reviewRepository } from '../../lib/repositories/reviewRepository';
+import { CheckCircle2, Globe, Instagram, Facebook, Calendar, Users, Star, Award, ShieldAlert } from 'lucide-astro';
+
+const { id: slug } = Astro.params; // Astro parses parameters based on file path
+
+if (!slug) {
+  return Astro.redirect('/404');
+}
+
+// Fetch Organization details
+const org = await organizationRepository.findBySlug(slug);
+
+if (!org) {
+  return Astro.redirect('/404');
+}
+
+const currentUser = Astro.locals.user;
+
+// Fetch stats
+const stats = await organizationRepository.getStats(org.id);
+
+// Check if user is following this organization
+const isFollowing = currentUser ? await organizationRepository.isFollowing(currentUser.id, org.id) : false;
+
+// Fetch activities belonging to organization
+const allOrgActivities = await activityRepository.list({
+  organizationId: org.id,
+  status: 'published', // we fetch published activities
+});
+
+const completedOrgActivities = await activityRepository.list({
+  organizationId: org.id,
+  status: 'completed', // we also fetch completed activities for history
+});
+
+// Group activities
+const now = new Date();
+const upcomingActivities = allOrgActivities.filter((act) => new Date(act.startsAt) > now);
+const pastActivities = [...completedOrgActivities, ...allOrgActivities.filter((act) => new Date(act.startsAt) <= now)];
+
+// Fetch reviews for organization activities
+const reviewsList = await reviewRepository.getByOrganization(org.id);
+
+// Format founded date
+const formattedFoundedDate = org.foundedAt 
+  ? new Date(org.foundedAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })
+  : null;
+---
+
+<Layout title={`${org.name} | Perfil de Organización`}>
+  <!-- Organization Cover Banner -->
+  <div class="relative w-full h-48 sm:h-64 bg-gradient-to-r from-emerald-600 to-indigo-600 overflow-hidden">
+    {org.banner && (
+      <img src={org.banner} alt={org.name} class="w-full h-full object-cover opacity-80" />
+    )}
+    <!-- Visual Gradient overlay -->
+    <div class="absolute inset-0 bg-black/10"></div>
+  </div>
+
+  <!-- Profile Info Header Section -->
+  <div class="bg-white border-b border-zinc-100 pb-8 relative z-10 -mt-16 sm:-mt-24">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        
+        <!-- Logo & Details -->
+        <div class="flex flex-col sm:flex-row items-center sm:items-end gap-5 text-center sm:text-left">
+          <img 
+            src={org.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${org.name}`}
+            alt={org.name}
+            class="h-28 w-28 sm:h-36 sm:w-36 rounded-3xl object-cover bg-white p-2 border border-zinc-200/80 shadow-md flex-shrink-0"
+          />
+          
+          <div class="space-y-2">
+            <!-- Badges -->
+            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <span class="inline-flex items-center rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
+                {org.type === 'NGO' ? 'ONG' : org.type === 'Foundation' ? 'Fundación' : org.type === 'Municipality' ? 'Municipio' : 'Grupo Comunitario'}
+              </span>
+              {org.verificationLevel !== 'none' && (
+                <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  <CheckCircle2 class="h-3.5 w-3.5 fill-emerald-500 text-white flex-shrink-0" />
+                  Verificado ({org.verificationLevel})
+                </span>
+              )}
+            </div>
+
+            <!-- Name -->
+            <h1 class="text-2xl font-black text-zinc-950 sm:text-3xl tracking-tight flex items-center justify-center sm:justify-start gap-2">
+              {org.name}
+            </h1>
+
+            <!-- Meta details (Founded date, social icons) -->
+            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs text-zinc-500 font-medium">
+              {formattedFoundedDate && (
+                <span>Fundada en {formattedFoundedDate}</span>
+              )}
+              
+              <!-- Contact details links -->
+              <div class="flex items-center gap-3 pt-1">
+                {org.website && (
+                  <a href={org.website} target="_blank" class="text-zinc-400 hover:text-emerald-600 transition-colors" aria-label="Sitio Web">
+                    <Globe class="h-4 w-4" />
+                  </a>
+                )}
+                {org.instagram && (
+                  <a href={org.instagram} target="_blank" class="text-zinc-400 hover:text-emerald-600 transition-colors" aria-label="Instagram">
+                    <Instagram class="h-4 w-4" />
+                  </a>
+                )}
+                {org.facebook && (
+                  <a href={org.facebook} target="_blank" class="text-zinc-400 hover:text-emerald-600 transition-colors" aria-label="Facebook">
+                    <Facebook class="h-4 w-4" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Follow Button Actions -->
+        <div class="flex items-center justify-center gap-3">
+          <button 
+            type="button" 
+            class={`inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] ${isFollowing ? 'bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-200' : 'bg-emerald-600 text-white shadow-emerald-100 hover:bg-emerald-700'}`}
+            onclick={`alert("${isFollowing ? 'Dejaste de seguir a esta organización.' : '¡Ahora seguís a esta organización! Te enviaremos alertas cuando publiquen nuevas actividades.'}")`}
+          >
+            {isFollowing ? 'Siguiendo organización' : 'Seguir organización'}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Body Content Grid -->
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+      
+      <!-- Left Column: Mission, Description & Reviews -->
+      <div class="lg:col-span-8 space-y-12">
+        
+        <!-- Mission / About -->
+        <div class="space-y-4">
+          <h2 class="text-xl font-bold text-zinc-950">Misión y Propósito</h2>
+          <p class="text-sm font-semibold text-zinc-800 leading-relaxed bg-zinc-50 border border-zinc-100 p-5 rounded-2xl italic">
+            "{org.mission || 'Trabajar día a día para lograr un cambio constructivo en nuestro entorno y empoderar a la comunidad a través de la ayuda mutua.'}"
+          </p>
+          <div class="text-sm text-zinc-600 leading-relaxed whitespace-pre-line pt-2">
+            {org.description}
+          </div>
+        </div>
+
+        <!-- Upcoming Activities tab -->
+        <div class="space-y-6">
+          <h2 class="text-xl font-bold text-zinc-950">Próximas actividades ({upcomingActivities.length})</h2>
+          {upcomingActivities.length === 0 ? (
+            <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay actividades programadas próximamente. ¡Registrate para seguir a la organización y enterarte de la próxima publicación!</p>
+          ) : (
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {upcomingActivities.map((act) => (
+                <ActivityCard activity={act} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Past Activities history -->
+        <div class="space-y-6">
+          <h2 class="text-xl font-bold text-zinc-950">Actividades realizadas ({pastActivities.length})</h2>
+          {pastActivities.length === 0 ? (
+            <p class="text-sm text-zinc-500">No hay registros de actividades finalizadas aún.</p>
+          ) : (
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {pastActivities.map((act) => (
+                <ActivityCard activity={act} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Reviews Tab -->
+        <div class="space-y-6">
+          <h2 class="text-xl font-bold text-zinc-950">Reseñas de la comunidad ({reviewsList.length})</h2>
+          {reviewsList.length === 0 ? (
+            <p class="text-sm text-zinc-500">No se han registrado opiniones de los participantes para esta organización todavía.</p>
+          ) : (
+            <div class="grid grid-cols-1 gap-4">
+              {reviewsList.map((rev) => (
+                <div>
+                  <div class="text-xs text-zinc-400 font-medium mb-1.5 px-1">Opinión en la actividad: <span class="font-bold text-emerald-600">{rev.activityTitle}</span></div>
+                  <ReviewCard review={rev} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      <!-- Right Column: Stats Overview & Contacts -->
+      <div class="lg:col-span-4 space-y-6">
+        <!-- Stats widget -->
+        <div class="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6">
+          <h3 class="text-base font-bold text-zinc-950">Métricas de impacto</h3>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-center">
+              <span class="block text-2xl font-black text-zinc-950">{stats?.followers || 0}</span>
+              <span class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-1">Seguidores</span>
+            </div>
+            <div class="bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-center">
+              <span class="block text-2xl font-black text-zinc-950">{stats?.activitiesCount || upcomingActivities.length + pastActivities.length}</span>
+              <span class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-1">Actividades</span>
+            </div>
+            <div class="bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-center">
+              <span class="block text-2xl font-black text-zinc-950">+{stats?.participantsCount || 30}</span>
+              <span class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-1">Asistentes</span>
+            </div>
+            <div class="bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-center">
+              <span class="block text-2xl font-black text-zinc-950">{stats?.views || 100}</span>
+              <span class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-1">Visitas</span>
+            </div>
+          </div>
+
+          <!-- Overall Rating -->
+          <div class="border-t border-zinc-100 pt-4 flex items-center justify-between">
+            <div class="flex items-center gap-1">
+              <span class="text-base font-bold text-zinc-950">Calificación promedio</span>
+              <span class="text-xs text-zinc-400 font-medium">({stats?.reviewsCount || reviewsList.length})</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-100/50 rounded-xl px-2.5 py-1">
+              <Star class="h-4 w-4 fill-amber-400 text-amber-400" />
+              <span class="text-sm font-extrabold text-amber-800">{stats?.rating || '0.00'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact direct box -->
+        <div class="rounded-3xl border border-zinc-100 bg-white p-6 shadow-sm space-y-4">
+          <h3 class="text-base font-bold text-zinc-950">Datos de contacto</h3>
+          
+          <div class="space-y-3.5 text-sm">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[10px] font-bold text-zinc-400 uppercase">Persona de contacto</span>
+              <span class="font-bold text-zinc-800">{org.contactPerson || 'Coordinador general'}</span>
+            </div>
+            {org.email && (
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">Correo electrónico</span>
+                <a href={`mailto:${org.email}`} class="font-semibold text-emerald-600 hover:underline truncate">{org.email}</a>
+              </div>
+            )}
+            {org.phone && (
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">Teléfono</span>
+                <span class="font-semibold text-zinc-800">{org.phone}</span>
+              </div>
+            )}
+            {org.whatsapp && (
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">WhatsApp directo</span>
+                <a 
+                  href={`https://wa.me/${org.whatsapp.replace('+', '').replace(' ', '')}`} 
+                  target="_blank" 
+                  class="font-semibold text-emerald-600 hover:underline flex items-center gap-1"
+                >
+                  💬 {org.whatsapp}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</Layout>

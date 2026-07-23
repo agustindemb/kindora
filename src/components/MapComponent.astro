@@ -1,0 +1,178 @@
+---
+interface Marker {
+  id: string;
+  title: string;
+  lat: number;
+  lng: number;
+  slug?: string;
+  address?: string;
+  price?: string;
+}
+
+interface Props {
+  markers: Marker[];
+  center?: [number, number];
+  zoom?: number;
+  heightClass?: string;
+}
+
+const { 
+  markers = [], 
+  center = [-34.6037, -58.3816], // Default Buenos Aires
+  zoom = 11,
+  heightClass = "h-96"
+} = Astro.props;
+---
+
+<div 
+  id="kindora-leaflet-map" 
+  class={`w-full rounded-2xl shadow-sm border border-zinc-100 relative ${heightClass} z-10 overflow-hidden`}
+  data-markers={JSON.stringify(markers)}
+  data-center={JSON.stringify(center)}
+  data-zoom={zoom}
+>
+  <!-- Loading State overlay -->
+  <div id="map-loading" class="absolute inset-0 bg-zinc-50 flex items-center justify-center z-20 transition-opacity duration-300">
+    <div class="flex flex-col items-center gap-3">
+      <div class="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-emerald-600"></div>
+      <span class="text-xs text-zinc-500 font-medium font-sans">Cargando mapa interactivo...</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Declare Leaflet globally (loaded from head script in layout)
+  declare const L: any;
+
+  function initMap() {
+    const mapElement = document.getElementById('kindora-leaflet-map');
+    if (!mapElement) return;
+
+    const markersData = JSON.parse(mapElement.getAttribute('data-markers') || '[]');
+    const centerData = JSON.parse(mapElement.getAttribute('data-center') || '[-34.6037, -58.3816]');
+    const zoomVal = parseInt(mapElement.getAttribute('data-zoom') || '11', 10);
+
+    // Initialize Leaflet Map
+    try {
+      const map = L.map('kindora-leaflet-map', {
+        scrollWheelZoom: false
+      }).setView(centerData, zoomVal);
+
+      // Add elegant Stamen/OSM light tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(map);
+
+      // Hide loading state
+      const loading = document.getElementById('map-loading');
+      if (loading) {
+        loading.style.opacity = '0';
+        setTimeout(() => loading.style.display = 'none', 300);
+      }
+
+      // Add Markers
+      const leafletMarkers: any[] = [];
+
+      markersData.forEach((m: any) => {
+        if (!m.lat || !m.lng) return;
+
+        // Custom HTML Icon
+        const isFree = parseFloat(m.price || '0') === 0;
+        const iconHtml = `
+          <div class="flex items-center justify-center h-8 w-8 rounded-full bg-emerald-600 border-2 border-white shadow-md text-white font-bold hover:scale-110 hover:bg-emerald-700 transition-all">
+            <span class="text-[14px]">📍</span>
+          </div>
+        `;
+
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: 'custom-map-pin',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+
+        const popupContent = `
+          <div class="p-2 font-sans min-w-[200px]">
+            <h4 class="text-sm font-bold text-zinc-950 mb-1 leading-tight">${m.title}</h4>
+            <p class="text-xs text-zinc-500 mb-2 leading-snug">${m.address || ''}</p>
+            <div class="flex items-center justify-between">
+              <span class="inline-flex rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">${isFree ? 'Gratis' : 'Actividad'}</span>
+              ${m.slug ? `<a href="/actividad/${m.id}-${m.slug}" class="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">Ver actividad &rarr;</a>` : ''}
+            </div>
+          </div>
+        `;
+
+        const marker = L.marker([m.lat, m.lng], { icon: customIcon })
+          .addTo(map)
+          .bindPopup(popupContent);
+
+        leafletMarkers.push(marker);
+      });
+
+      // Adjust map bounds if multiple markers exist
+      if (leafletMarkers.length > 1) {
+        const group = new L.featureGroup(leafletMarkers);
+        map.fitBounds(group.getBounds().pad(0.15));
+      }
+
+    } catch (e) {
+      console.error("Leaflet map failed to initialize:", e);
+      const loading = document.getElementById('map-loading');
+      if (loading) {
+        loading.innerHTML = `
+          <div class="text-center p-4">
+            <p class="text-sm font-bold text-rose-600">Error al cargar el mapa</p>
+            <p class="text-xs text-zinc-500 mt-1">Verificá tu conexión a internet</p>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // Load Leaflet map on Page Load (client side)
+  window.addEventListener('DOMContentLoaded', () => {
+    // Wait slightly to make sure Leaflet library is ready
+    if (typeof L !== 'undefined') {
+      initMap();
+    } else {
+      let retries = 0;
+      const interval = setInterval(() => {
+        if (typeof L !== 'undefined') {
+          clearInterval(interval);
+          initMap();
+        } else if (++retries > 50) {
+          clearInterval(interval);
+          console.error("Leaflet failed to load.");
+        }
+      }, 100);
+    }
+  });
+</script>
+
+<style is:global>
+  /* Customize Leaflet Popup styling for premium look */
+  .leaflet-popup-content-wrapper {
+    border-radius: 12px !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid #f4f4f5 !important;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  }
+  .leaflet-popup-content {
+    margin: 8px 12px !important;
+  }
+  .leaflet-popup-tip {
+    box-shadow: none !important;
+    border: 1px solid #f4f4f5 !important;
+  }
+  .leaflet-container a.leaflet-popup-close-button {
+    color: #a1a1aa !important;
+    padding: 6px !important;
+  }
+  .leaflet-container a.leaflet-popup-close-button:hover {
+    color: #3f3f46 !important;
+  }
+</style>

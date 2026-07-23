@@ -1,0 +1,478 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ActivityCard from '../components/ActivityCard.astro';
+import MapComponent from '../components/MapComponent.astro';
+import { activityRepository } from '../lib/repositories/activityRepository';
+import { searchService } from '../services/searchService';
+import { Search, MapPin, Calendar, BookOpen, HeartHandshake, ShieldCheck, Star, ChevronDown } from 'lucide-astro';
+
+// Load initial data
+const categoriesList = await activityRepository.getCategories();
+const allActivities = await searchService.search();
+
+// Split activities into sections for demo
+const popularActivities = allActivities.slice(0, 2);
+const newActivities = allActivities.slice(2, 4);
+const mapMarkers = allActivities.map((act) => ({
+  id: act.id,
+  title: act.title,
+  lat: act.location.latitude || -34.6037,
+  lng: act.location.longitude || -58.3816,
+  slug: act.slug,
+  address: act.location.address,
+  price: act.price
+}));
+
+// Cities list for search dropdown
+const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
+---
+
+<Layout title="Kindora | Actividades con impacto positivo">
+  <!-- Hero Section with Airbnb-Style Search -->
+  <section class="relative bg-zinc-50 border-b border-zinc-100 py-16 sm:py-24">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center">
+        <!-- Hero Text -->
+        <div class="space-y-6 lg:col-span-6">
+          <h1 class="text-4xl font-extrabold tracking-tight text-zinc-950 sm:text-5xl xl:text-6xl leading-[1.1]">
+            Encontrá actividades que <span class="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-2xl">hacen bien.</span>
+          </h1>
+          <p class="text-lg text-zinc-600 sm:text-xl leading-relaxed">
+            Descubrí talleres, encuentros, voluntariados, deportes y experiencias inclusivas organizadas por personas y organizaciones verificadas de tu comunidad.
+          </p>
+
+          <!-- Airbnb-Style Search Bar -->
+          <div class="w-full max-w-2xl rounded-3xl border border-zinc-200/80 bg-white p-2 shadow-lg shadow-zinc-100">
+            <form action="/explorar" method="GET" class="flex flex-col md:flex-row items-stretch md:items-center gap-1">
+              
+              <!-- Query Input -->
+              <div class="flex-grow px-4 py-2 border-b md:border-b-0 md:border-r border-zinc-100">
+                <label for="search-query" class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">¿Qué buscás?</label>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <Search class="h-4 w-4 text-zinc-400" />
+                  <input 
+                    type="text" 
+                    id="search-query"
+                    name="query" 
+                    placeholder="Autismo, huerta, gratis..." 
+                    class="w-full bg-transparent text-sm font-medium text-zinc-800 placeholder-zinc-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <!-- City Input (Custom Dropdown) -->
+              <div class="relative flex-grow px-4 py-2 border-b md:border-b-0 md:border-r border-zinc-100" id="city-dropdown-container">
+                <label class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">¿Dónde?</label>
+                <button
+                  type="button"
+                  id="city-dropdown-trigger"
+                  class="flex items-center gap-1.5 mt-0.5 w-full text-left bg-transparent text-sm font-semibold text-zinc-800 focus:outline-none cursor-pointer justify-between select-none pr-1"
+                >
+                  <span class="flex items-center gap-1.5 overflow-hidden">
+                    <MapPin class="h-4 w-4 text-zinc-450 flex-shrink-0" />
+                    <span id="selected-city-text" class="truncate">Cualquier ciudad</span>
+                  </span>
+                  <ChevronDown class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200" id="city-arrow" />
+                </button>
+                <input type="hidden" name="city" id="hidden-city-input" value="" />
+                
+                <!-- Dropdown Menu -->
+                <div 
+                  id="city-dropdown-menu" 
+                  class="hidden absolute left-0 right-0 md:min-w-[200px] top-full mt-3 bg-white border border-zinc-150 shadow-xl rounded-2xl p-1.5 z-50 max-h-60 overflow-y-auto flex flex-col gap-0.5"
+                >
+                  <button 
+                    type="button" 
+                    class="w-full text-left px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:text-emerald-700 hover:bg-emerald-50/50 rounded-xl transition-all" 
+                    data-value=""
+                  >
+                    Cualquier ciudad
+                  </button>
+                  {cities.map((city) => (
+                    <button 
+                      type="button" 
+                      class="w-full text-left px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:text-emerald-700 hover:bg-emerald-50/50 rounded-xl transition-all" 
+                      data-value={city}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <!-- Date Selection (Custom Dropdown) -->
+              <div class="relative flex-grow px-4 py-2 border-b md:border-b-0 border-zinc-100" id="date-dropdown-container">
+                <label class="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">¿Cuándo?</label>
+                <button
+                  type="button"
+                  id="date-dropdown-trigger"
+                  class="flex items-center gap-1.5 mt-0.5 w-full text-left bg-transparent text-sm font-semibold text-zinc-800 focus:outline-none cursor-pointer justify-between select-none pr-1"
+                >
+                  <span class="flex items-center gap-1.5 overflow-hidden">
+                    <Calendar class="h-4 w-4 text-zinc-450 flex-shrink-0" />
+                    <span id="selected-date-text" class="truncate">Cualquier fecha</span>
+                  </span>
+                  <ChevronDown class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200" id="date-arrow" />
+                </button>
+                <input type="hidden" name="when" id="hidden-date-input" value="any" />
+                
+                <!-- Dropdown Menu -->
+                <div 
+                  id="date-dropdown-menu" 
+                  class="hidden absolute left-0 right-0 md:min-w-[200px] top-full mt-3 bg-white border border-zinc-150 shadow-xl rounded-2xl p-1.5 z-50 flex flex-col gap-0.5"
+                >
+                  <button 
+                    type="button" 
+                    class="w-full text-left px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:text-emerald-700 hover:bg-emerald-50/50 rounded-xl transition-all" 
+                    data-value="any"
+                  >
+                    Cualquier fecha
+                  </button>
+                  <button 
+                    type="button" 
+                    class="w-full text-left px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:text-emerald-700 hover:bg-emerald-50/50 rounded-xl transition-all" 
+                    data-value="sábado"
+                  >
+                    Sábados
+                  </button>
+                  <button 
+                    type="button" 
+                    class="w-full text-left px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:text-emerald-700 hover:bg-emerald-50/50 rounded-xl transition-all" 
+                    data-value="finde"
+                  >
+                    Fines de semana
+                  </button>
+                </div>
+              </div>
+
+              <!-- Search Button -->
+              <button 
+                type="submit" 
+                class="flex h-12 w-full md:w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                aria-label="Buscar actividades"
+              >
+                <Search class="h-5 w-5" />
+                <span class="md:hidden ml-2 font-semibold">Buscar</span>
+              </button>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- Hero Illustration -->
+        <div class="hidden lg:block lg:col-span-6">
+          <img 
+            src="/images/kindora_hero.jpg" 
+            alt="Personas colaborando en comunidad" 
+            class="w-full max-w-lg mx-auto rounded-3xl object-cover shadow-xl shadow-zinc-100 border-2 border-white"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categories Grid -->
+  <section class="py-16 sm:py-24 bg-white">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl mb-8">
+        Explorá por categorías
+      </h2>
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        {categoriesList.map((cat) => {
+          const emoji = cat.slug === 'autismo' ? '🧩' : cat.slug === 'discapacidad' ? '♿' : cat.slug === 'infancias' ? '👶' : cat.slug === 'adultos-mayores' ? '👴' : cat.slug === 'voluntariado' ? '🤝' : cat.slug === 'medio-ambiente' ? '🌱' : cat.slug === 'salud-mental' ? '🧠' : cat.slug === 'educacion' ? '📚' : cat.slug === 'arte-y-cultura' ? '🎨' : cat.slug === 'deportes' ? '⚽' : cat.slug === 'rescate-animal' ? '🐶' : '🏡';
+          return (
+            <a 
+              href={`/explorar?category=${cat.id}`} 
+              class="flex flex-col items-center justify-center p-6 rounded-2xl border border-zinc-100 bg-zinc-50/50 hover:bg-white hover:border-emerald-200 hover:shadow-sm hover:shadow-emerald-50 hover:-translate-y-0.5 transition-all duration-300 text-center group"
+            >
+              <span class="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300">{emoji}</span>
+              <span class="text-sm font-semibold text-zinc-900 leading-snug group-hover:text-emerald-700 transition-colors">{cat.name}</span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Sections -->
+  <section class="py-16 bg-zinc-50/50 border-y border-zinc-100">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      
+      <!-- Section 1: Popular Hoy -->
+      <div class="mb-16">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">🔥 Popular hoy</h2>
+            <p class="text-sm text-zinc-500 mt-1">Las actividades más consultadas por la comunidad.</p>
+          </div>
+          <a href="/explorar" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">Ver todas &rarr;</a>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {popularActivities.map((act) => (
+            <ActivityCard activity={act} />
+          ))}
+          {/* Fallback mock cards if list is small */}
+          {allActivities.slice(0, 4).map((act, i) => i >= popularActivities.length && (
+            <ActivityCard activity={act} />
+          ))}
+        </div>
+      </div>
+
+      <!-- Section 2: Nuevas Actividades -->
+      <div>
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">🆕 Nuevas actividades</h2>
+            <p class="text-sm text-zinc-500 mt-1">Recién publicadas y listas para que te sumes.</p>
+          </div>
+          <a href="/explorar" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">Ver todas &rarr;</a>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {newActivities.map((act) => (
+            <ActivityCard activity={act} />
+          ))}
+          {/* Fallback mock cards if list is small */}
+          {allActivities.slice(1, 5).map((act, i) => i >= newActivities.length && (
+            <ActivityCard activity={act} />
+          ))}
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Interactive Map Section -->
+  <section class="py-16 sm:py-24 bg-white">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">📍 Actividades cerca tuyo</h2>
+          <p class="text-sm text-zinc-500 mt-1">Explorá el mapa interactivo para ver qué está sucediendo en tu barrio.</p>
+        </div>
+        <a href="/explorar?view=map" class="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 transition-colors">
+          Ver todas en el mapa
+        </a>
+      </div>
+      
+      <!-- Leaflet Map component -->
+      <MapComponent markers={mapMarkers} center={[-34.5885, -58.4306]} zoom={10} heightClass="h-[450px]" />
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section id="como-funciona" class="py-16 sm:py-24 bg-zinc-50 border-t border-zinc-100">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-4xl">Cómo funciona Kindora</h2>
+        <p class="text-base text-zinc-500 mt-2">La plataforma de conexión comunitaria más simple y confiable de Latinoamérica.</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-12 lg:grid-cols-2">
+        <!-- For Participants -->
+        <div class="bg-white rounded-2xl border border-zinc-100 p-8 shadow-sm">
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 mb-6">
+            <HeartHandshake class="h-6 w-6" />
+          </div>
+          <h3 class="text-xl font-bold text-zinc-950 mb-6">Para personas</h3>
+          <ol class="space-y-6">
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">1</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Explorá</h4>
+                <p class="text-xs text-zinc-500 mt-1">Buscá actividades por tus intereses, ubicación o facilidades de accesibilidad necesarias.</p>
+              </div>
+            </li>
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">2</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Registrate</h4>
+                <p class="text-xs text-zinc-500 mt-1">Inscribite en un solo click. Tu lugar queda reservado de inmediato de forma gratuita.</p>
+              </div>
+            </li>
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">3</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Participá</h4>
+                <p class="text-xs text-zinc-500 mt-1">Vení a la actividad, compartí con tus vecinos, aprendé algo nuevo y ayudá con impacto positivo.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <!-- For Organizations -->
+        <div class="bg-white rounded-2xl border border-zinc-100 p-8 shadow-sm">
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 mb-6">
+            <ShieldCheck class="h-6 w-6" />
+          </div>
+          <h3 class="text-xl font-bold text-zinc-950 mb-6">Para organizaciones</h3>
+          <ol class="space-y-6">
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">1</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Verificá tu cuenta</h4>
+                <p class="text-xs text-zinc-500 mt-1">Completá el proceso de verificación subiendo tus datos para obtener la insignia de confianza.</p>
+              </div>
+            </li>
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">2</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Publicá actividades</h4>
+                <p class="text-xs text-zinc-500 mt-1">Creá actividades de forma simple completando ubicaciones, cupos y requisitos de accesibilidad.</p>
+              </div>
+            </li>
+            <li class="flex gap-4">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold flex-shrink-0">3</span>
+              <div>
+                <h4 class="font-bold text-zinc-900 text-sm">Conectá con la comunidad</h4>
+                <p class="text-xs text-zinc-500 mt-1">Gestioná inscriptos, chateá con los participantes y hacé crecer la participación en tus causas.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="py-16 sm:py-24 bg-white border-t border-zinc-100">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-4xl">La voz de la comunidad</h2>
+        <p class="text-base text-zinc-500 mt-2">Testimonios reales de personas que ya participan en actividades con impacto positivo.</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <!-- Testimonial 1 -->
+        <div class="rounded-2xl bg-zinc-50 p-6 border border-zinc-100 relative">
+          <div class="flex items-center gap-0.5 text-amber-400 mb-4">
+            {Array.from({ length: 5 }).map(() => <Star class="h-4 w-4 fill-current" />)}
+          </div>
+          <p class="text-sm text-zinc-700 leading-relaxed italic mb-6">
+            "Encontré un grupo de básquet en silla de ruedas en Rosario y fue un antes y un después. La calidad humana y la facilidad para inscribirme mediante Kindora hicieron que todo fuera muy sencillo."
+          </p>
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">MA</div>
+            <div>
+              <h4 class="text-xs font-bold text-zinc-900">Martín Arce</h4>
+              <p class="text-[10px] text-zinc-400">Participante de Deportes Inclusivos</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Testimonial 2 -->
+        <div class="rounded-2xl bg-zinc-50 p-6 border border-zinc-100 relative">
+          <div class="flex items-center gap-0.5 text-amber-400 mb-4">
+            {Array.from({ length: 5 }).map(() => <Star class="h-4 w-4 fill-current" />)}
+          </div>
+          <p class="text-sm text-zinc-700 leading-relaxed italic mb-6">
+            "Como madre de un niño con autismo, me costaba encontrar talleres con la accesibilidad adecuada. Con Kindora busco por la etiqueta 'Apto TEA' y sé que mi hijo estará en un entorno seguro y feliz."
+          </p>
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">SV</div>
+            <div>
+              <h4 class="text-xs font-bold text-zinc-900">Silvia Valenzuela</h4>
+              <p class="text-[10px] text-zinc-400">Madre de Lucas (6 años)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Testimonial 3 -->
+        <div class="rounded-2xl bg-zinc-50 p-6 border border-zinc-100 relative">
+          <div class="flex items-center gap-0.5 text-amber-400 mb-4">
+            {Array.from({ length: 5 }).map(() => <Star class="h-4 w-4 fill-current" />)}
+          </div>
+          <p class="text-sm text-zinc-700 leading-relaxed italic mb-6">
+            "Kindora nos ayudó a multiplicar la cantidad de voluntarios para nuestras plantaciones de nativas en el Delta. Nos dio visibilidad, y los participantes destacan la confianza que les da la plataforma."
+          </p>
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">ER</div>
+            <div>
+              <h4 class="text-xs font-bold text-zinc-900">Esteban Russo</h4>
+              <p class="text-[10px] text-zinc-400">Coordinador de Huerta Delta</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const cityTrigger = document.getElementById('city-dropdown-trigger');
+  const cityMenu = document.getElementById('city-dropdown-menu');
+  const cityArrow = document.getElementById('city-arrow');
+  const cityText = document.getElementById('selected-city-text');
+  const cityInput = document.getElementById('hidden-city-input') as HTMLInputElement;
+
+  const dateTrigger = document.getElementById('date-dropdown-trigger');
+  const dateMenu = document.getElementById('date-dropdown-menu');
+  const dateArrow = document.getElementById('date-arrow');
+  const dateText = document.getElementById('selected-date-text');
+  const dateInput = document.getElementById('hidden-date-input') as HTMLInputElement;
+
+  // Toggle dropdowns helper
+  function toggleMenu(menu: HTMLElement | null, arrow: HTMLElement | null, open: boolean) {
+    if (!menu) return;
+    if (open) {
+      menu.classList.remove('hidden');
+      if (arrow) arrow.classList.add('rotate-180');
+    } else {
+      menu.classList.add('hidden');
+      if (arrow) arrow.classList.remove('rotate-180');
+    }
+  }
+
+  // City Trigger
+  if (cityTrigger) {
+    cityTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isClosed = cityMenu?.classList.contains('hidden');
+      toggleMenu(cityMenu, cityArrow, !!isClosed);
+      toggleMenu(dateMenu, dateArrow, false); // close other
+    });
+  }
+
+  // Date Trigger
+  if (dateTrigger) {
+    dateTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isClosed = dateMenu?.classList.contains('hidden');
+      toggleMenu(dateMenu, dateArrow, !!isClosed);
+      toggleMenu(cityMenu, cityArrow, false); // close other
+    });
+  }
+
+  // City Selection
+  if (cityMenu) {
+    const buttons = cityMenu.querySelectorAll('button');
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-value') || '';
+        const txt = btn.textContent?.trim() || 'Cualquier ciudad';
+        if (cityInput) cityInput.value = val;
+        if (cityText) cityText.textContent = txt;
+        toggleMenu(cityMenu, cityArrow, false);
+      });
+    });
+  }
+
+  // Date Selection
+  if (dateMenu) {
+    const buttons = dateMenu.querySelectorAll('button');
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-value') || 'any';
+        const txt = btn.textContent?.trim() || 'Cualquier fecha';
+        if (dateInput) dateInput.value = val;
+        if (dateText) dateText.textContent = txt;
+        toggleMenu(dateMenu, dateArrow, false);
+      });
+    });
+  }
+
+  // Click outside to close
+  window.addEventListener('click', () => {
+    toggleMenu(cityMenu, cityArrow, false);
+    toggleMenu(dateMenu, dateArrow, false);
+  });
+</script>
