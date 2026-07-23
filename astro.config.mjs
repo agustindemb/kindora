@@ -13,6 +13,7 @@ export default defineConfig({
   },
 
   adapter: node({
-    mode: 'standalone'
+    mode: 'standalone',
+    port: 3582
   })
 });
