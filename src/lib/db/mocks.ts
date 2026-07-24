@@ -298,7 +298,7 @@ export const mockActivities: MockActivity[] = [
 export const mockActivityImages = [
   { id: "img-1", activityId: "act-1", url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800", order: 1, isCover: true },
   { id: "img-2", activityId: "act-2", url: "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=800", order: 1, isCover: true },
-  { id: "img-3", activityId: "act-3", url: "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=800", order: 1, isCover: true },
+  { id: "img-3", activityId: "act-3", url: "https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=800", order: 1, isCover: true },
   { id: "img-4", activityId: "act-4", url: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800", order: 1, isCover: true },
   { id: "img-5", activityId: "act-5", url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=800", order: 1, isCover: true }
 ];

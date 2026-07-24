@@ -145,16 +145,18 @@ export const searchService = {
       }
 
       // Run query to get matching IDs
-      const matchedIds = await baseQuery
+      const rawMatchedIds = await baseQuery
         .where(and(...conditions))
         .orderBy(sql`${activities.startsAt} asc`)
         .limit(50);
 
-      if (matchedIds.length === 0) return [];
+      const uniqueIds = Array.from(new Set(rawMatchedIds.map((m) => m.id)));
+
+      if (uniqueIds.length === 0) return [];
 
       // Fetch full details
       const enrichedResults = await Promise.all(
-        matchedIds.map((m) => activityRepository.findById(m.id))
+        uniqueIds.map((id) => activityRepository.findById(id))
       );
 
       let results = enrichedResults.filter(Boolean) as ActivityWithDetails[];
