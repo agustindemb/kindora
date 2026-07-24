@@ -671,6 +671,29 @@ export const activityRepository = {
         .insert(inscriptions)
         .values({ activityId, userId, status })
         .returning();
+
+      // Send confirmation email asynchronously
+      (async () => {
+        try {
+          const { userRepository } = await import("./userRepository");
+          const { emailService } = await import("../../services/emailService");
+          const targetUser = await userRepository.findById(userId);
+          const targetAct = await this.findById(activityId);
+          if (targetUser && targetAct && targetUser.email) {
+            await emailService.sendActivityRegistration(targetUser.email, targetUser.name, {
+              title: targetAct.title,
+              startsAt: targetAct.startsAt,
+              city: targetAct.location?.city || "Tu Ciudad",
+              address: targetAct.location?.address || undefined,
+              id: targetAct.id,
+              slug: targetAct.slug,
+            });
+          }
+        } catch (e) {
+          console.warn("[ActivityRepository] Error sending registration email:", e);
+        }
+      })();
+
       return results[0];
     } catch (error) {
       console.warn("DB Connection failed, simulating participant registration.");

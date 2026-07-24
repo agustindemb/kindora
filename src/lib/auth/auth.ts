@@ -54,6 +54,14 @@ export const auth = betterAuth({
           }
           return { data: userData };
         },
+        after: async (userData) => {
+          try {
+            const { emailService } = await import('../../services/emailService');
+            await emailService.sendAccountCreated(userData.email, userData.name || "Usuario");
+          } catch (e) {
+            console.warn('[Auth] Error triggering account_created email:', e);
+          }
+        },
       },
     },
     session: {

@@ -149,6 +149,24 @@ if (Astro.request.method === 'POST') {
         // Mock default cover image
         [{ url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800', order: 1, isCover: true }]
       );
+
+      // Send email update notification to registered participants
+      try {
+        const inscriptionsList = await activityRepository.getInscriptions(editId);
+        const { emailService } = await import('../../../services/emailService');
+        for (const ins of inscriptionsList) {
+          if (ins.user?.email) {
+            await emailService.sendActivityUpdated(ins.user.email, ins.user.name, {
+              title,
+              startsAt: startsAtVal,
+              city,
+              address,
+              id: editId,
+              slug: activityToEdit?.slug || 'actividad',
+            });
+          }
+        }
+      } catch(e){}
     }
 
     return Astro.redirect('/dashboard/organizador');

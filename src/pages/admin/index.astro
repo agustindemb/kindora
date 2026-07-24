@@ -193,6 +193,15 @@ if (Astro.request.method === 'POST') {
         details: JSON.stringify({ level, verifiedAt: new Date() }),
       });
 
+      // Send email notification to organization
+      const targetOrgs = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
+      if (targetOrgs.length > 0 && targetOrgs[0].email) {
+        try {
+          const { emailService } = await import('../../services/emailService');
+          await emailService.sendOrganizationApproved(targetOrgs[0].email, targetOrgs[0].name);
+        } catch(e){}
+      }
+
       successMsg = `Organización aprobada con nivel: ${level.toUpperCase()}. Sus actividades pendientes han sido publicadas.`;
       return Astro.redirect('/admin?tab=verifications');
 
