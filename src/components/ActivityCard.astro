@@ -53,11 +53,14 @@ const isOrgVerified = activity.organization?.verificationLevel !== 'none';
         {activity.category?.name}
       </span>
 
-      <!-- Bookmark Button (Visual Mock for MVP) -->
+      <!-- Bookmark Button -->
       <button 
         type="button" 
-        class={`rounded-full p-2 shadow-sm transition-all hover:scale-115 ${isBookmarked ? 'bg-rose-50 text-rose-500' : 'bg-white/90 text-zinc-400 hover:text-rose-500'} backdrop-blur-sm`}
+        data-card-bookmark-btn
+        data-activity-id={activity.id}
+        class={`rounded-full p-2 shadow-sm transition-all hover:scale-110 cursor-pointer ${isBookmarked ? 'bg-rose-50 text-rose-500' : 'bg-white/90 text-zinc-400 hover:text-rose-500'} backdrop-blur-sm z-10`}
         aria-label={isBookmarked ? "Quitar de favoritos" : "Guardar actividad"}
+        onclick="event.stopPropagation(); event.preventDefault();"
       >
         <Heart class={`h-4 w-4 ${isBookmarked ? 'fill-rose-500' : ''}`} />
       </button>
@@ -131,3 +134,47 @@ const isOrgVerified = activity.organization?.verificationLevel !== 'none';
 
   </div>
 </article>
+
+<script>
+  document.querySelectorAll('[data-card-bookmark-btn]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const activityId = btn.getAttribute('data-activity-id');
+      if (!activityId) return;
+
+      try {
+        const res = await fetch('/api/favoritos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activityId })
+        });
+
+        const data = await res.json();
+
+        if (res.status === 401) {
+          alert('Debes iniciar sesión para guardar actividades en tus favoritos.');
+          window.location.href = '/auth/login';
+          return;
+        }
+
+        if (!res.ok) {
+          alert(data.error || 'Error al procesar favoritos.');
+          return;
+        }
+
+        const isBookmarked = data.isBookmarked;
+        const svg = btn.querySelector('svg');
+        if (isBookmarked) {
+          btn.className = 'rounded-full p-2 shadow-sm transition-all hover:scale-110 cursor-pointer bg-rose-50 text-rose-500 backdrop-blur-sm z-10';
+          svg?.classList.add('fill-rose-500');
+        } else {
+          btn.className = 'rounded-full p-2 shadow-sm transition-all hover:scale-110 cursor-pointer bg-white/90 text-zinc-400 hover:text-rose-500 backdrop-blur-sm z-10';
+          svg?.classList.remove('fill-rose-500');
+        }
+      } catch (err) {
+        console.error('Error toggling card bookmark:', err);
+      }
+    });
+  });
+</script>
