@@ -1,0 +1,181 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { userRepository } from '../../lib/repositories/userRepository';
+import { activityRepository } from '../../lib/repositories/activityRepository';
+import { User, Mail, Calendar, MapPin, ArrowLeft, Heart, CheckCircle2, ShieldCheck } from 'lucide-astro';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/404');
+}
+
+const targetUser = await userRepository.findById(id);
+
+if (!targetUser) {
+  return Astro.redirect('/404');
+}
+
+let userInscriptions: any[] = [];
+try {
+  userInscriptions = await activityRepository.getUserInscriptions(targetUser.id);
+} catch (e) {
+  console.error("Error loading user inscriptions:", e);
+}
+
+const currentUser = Astro.locals.user;
+
+const joinedDate = targetUser.createdAt 
+  ? new Date(targetUser.createdAt).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })
+  : 'Miembro reciente';
+
+const initialLetter = (targetUser.name || 'U').charAt(0).toUpperCase();
+---
+
+<Layout title={`${targetUser.name} | Perfil en Kindora`}>
+  <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+    
+    <!-- Back Button -->
+    <div>
+      <button 
+        onclick="history.back()" 
+        class="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+      >
+        <ArrowLeft class="h-4 w-4" />
+        Volver
+      </button>
+    </div>
+
+    <!-- User Header Profile Card -->
+    <div class="bg-white border border-zinc-200/80 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
+        
+        <!-- Avatar -->
+        {targetUser.image ? (
+          <img 
+            src={targetUser.image} 
+            alt={targetUser.name} 
+            class="h-24 w-24 rounded-full object-cover border-4 border-emerald-50 shadow-md"
+          />
+        ) : (
+          <div class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 text-3xl font-black text-white shadow-md shadow-emerald-100">
+            {initialLetter}
+          </div>
+        )}
+
+        <!-- Profile Details -->
+        <div class="space-y-3 flex-1">
+          <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+            <h1 class="text-2xl font-black tracking-tight text-zinc-900 font-sans">{targetUser.name}</h1>
+            
+            <!-- Role Badge -->
+            <span class={`inline-flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-bold ${
+              targetUser.role === 'admin' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+              targetUser.role === 'organizer' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+              'bg-blue-50 text-blue-800 border border-blue-200'
+            }`}>
+              <ShieldCheck class="h-3.5 w-3.5" />
+              {targetUser.role === 'admin' ? 'Administrador' :
+               targetUser.role === 'organizer' ? 'Organizador' :
+               'Participante / Voluntario'}
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-zinc-500 font-medium">
+            {targetUser.email && (
+              <div class="flex items-center gap-1.5">
+                <Mail class="h-3.5 w-3.5 text-zinc-400" />
+                <span>{targetUser.email}</span>
+              </div>
+            )}
+            <div class="flex items-center gap-1.5">
+              <Calendar class="h-3.5 w-3.5 text-zinc-400" />
+              <span>Unido/a en {joinedDate}</span>
+            </div>
+          </div>
+
+          <!-- Contact Button -->
+          {targetUser.email && (
+            <div class="pt-2 flex justify-center sm:justify-start">
+              <a 
+                href={`mailto:${targetUser.email}?subject=Mensaje desde Kindora`}
+                class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
+              >
+                <Mail class="h-3.5 w-3.5" />
+                Enviar correo electrónico
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <!-- Activities / Involvement Section -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-black text-zinc-950 font-sans flex items-center gap-2">
+        <span>Actividades en las que participa</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">{userInscriptions.length}</span>
+      </h2>
+
+      {userInscriptions.length === 0 ? (
+        <div class="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center text-sm text-zinc-500">
+          Este usuario aún no se ha inscripto en actividades públicas.
+        </div>
+      ) : (
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {userInscriptions.map((ins) => {
+            const act = ins.activity;
+            if (!act) return null;
+            
+            return (
+              <div class="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3">
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${
+                      ins.status === 'volunteer' ? 'bg-violet-50 text-violet-700 border border-violet-200' :
+                      ins.status === 'registered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      ins.status === 'attended' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                      'bg-zinc-100 text-zinc-600'
+                    }`}>
+                      {ins.status === 'volunteer' ? '🌱 Voluntario/a' :
+                       ins.status === 'registered' ? '✅ Inscripto/a' :
+                       ins.status === 'attended' ? '🎯 Asistió' :
+                       'Cancelado'}
+                    </span>
+
+                    {act.organization?.name && (
+                      <span class="text-[11px] font-semibold text-zinc-400 truncate max-w-[150px]">
+                        {act.organization.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <a 
+                    href={`/actividad/${act.id}-${act.slug}`} 
+                    class="block font-bold text-zinc-900 hover:text-emerald-600 transition-colors text-base line-clamp-1"
+                  >
+                    {act.title}
+                  </a>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-zinc-400 pt-2 border-t border-zinc-100">
+                  <span class="flex items-center gap-1">
+                    <Calendar class="h-3.5 w-3.5" />
+                    {act.startsAt ? new Date(act.startsAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : 'Próximamente'}
+                  </span>
+
+                  <a 
+                    href={`/actividad/${act.id}-${act.slug}`}
+                    class="font-semibold text-emerald-600 hover:underline"
+                  >
+                    Ver actividad &rarr;
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
+</Layout>

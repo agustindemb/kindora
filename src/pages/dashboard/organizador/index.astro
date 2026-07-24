@@ -138,6 +138,18 @@ if (Astro.request.method === 'POST') {
       
       // Refresh
       return Astro.redirect('/dashboard/organizador');
+    } else if (action === 'remove_inscription') {
+      const insId = formData.get('inscriptionId') as string;
+      const actId = formData.get('activityId') as string;
+      const usrId = formData.get('userId') as string;
+      
+      if (insId) {
+        await db.delete(schema.inscriptions).where(eq(schema.inscriptions.id, insId));
+      } else if (actId && usrId) {
+        await activityRepository.unregisterParticipant(actId, usrId);
+      }
+      successMsg = 'Participante eliminado de la actividad.';
+      return Astro.redirect('/dashboard/organizador');
     } else if (action === 'delete_organization') {
       if (org) {
         await organizationRepository.softDelete(org.id);
@@ -454,7 +466,10 @@ import * as schema from '../../../lib/db/schema';
                         {pendingInscriptionsList.map((ins) => (
                           <tr class="hover:bg-zinc-50/50 transition-colors">
                             <td class="px-6 py-4">
-                              <span class="block font-bold text-zinc-900">{ins.user?.name}</span>
+                              <a href={`/perfil/${ins.userId || ins.user?.id}`} target="_blank" class="font-bold text-zinc-900 hover:text-emerald-600 hover:underline inline-flex items-center gap-1 group">
+                                <span>{ins.user?.name}</span>
+                                <span class="text-[10px] text-zinc-400 group-hover:text-emerald-500 font-normal">↗</span>
+                              </a>
                               <span class="block text-[10px] text-zinc-400">{ins.user?.email}</span>
                             </td>
                             <td class="px-6 py-4 text-xs font-medium">
@@ -477,21 +492,36 @@ import * as schema from '../../../lib/db/schema';
                               </span>
                             </td>
                             <td class="px-6 py-4">
-                              {ins.status === 'registered' && (
-                                <form method="POST" class="m-0">
-                                  <input type="hidden" name="action" value="approve_inscription" />
+                              <div class="flex items-center gap-3">
+                                {ins.status === 'registered' && (
+                                  <form method="POST" class="m-0">
+                                    <input type="hidden" name="action" value="approve_inscription" />
+                                    <input type="hidden" name="inscriptionId" value={ins.id} />
+                                    <input type="hidden" name="activityId" value={ins.activityId} />
+                                    <button type="submit" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                                      Registrar Asistencia
+                                    </button>
+                                  </form>
+                                )}
+                                {ins.status === 'volunteer' && ins.user?.email && (
+                                  <a href={`mailto:${ins.user.email}?subject=Gracias por ser voluntario/a en ${ins.activityTitle}`} class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline">
+                                    Contactar
+                                  </a>
+                                )}
+                                <form method="POST" class="m-0" onsubmit="return confirm('¿Estás seguro/a de quitar a esta persona de la actividad?');">
+                                  <input type="hidden" name="action" value="remove_inscription" />
                                   <input type="hidden" name="inscriptionId" value={ins.id} />
                                   <input type="hidden" name="activityId" value={ins.activityId} />
-                                  <button type="submit" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                                    Registrar Asistencia
+                                  <input type="hidden" name="userId" value={ins.userId || ins.user?.id} />
+                                  <button 
+                                    type="submit" 
+                                    class="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline"
+                                    title="Eliminar de la actividad"
+                                  >
+                                    Eliminar
                                   </button>
                                 </form>
-                              )}
-                              {ins.status === 'volunteer' && ins.user?.email && (
-                                <a href={`mailto:${ins.user.email}?subject=Gracias por ser voluntario/a en ${ins.activityTitle}`} class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline">
-                                  Contactar
-                                </a>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         ))}
