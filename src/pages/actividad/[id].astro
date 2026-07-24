@@ -456,42 +456,44 @@ const jsonLd = {
           </div>
 
           <!-- Button Actions for Inscriptions -->
-          {isRegistered ? (
-            <div class="space-y-3">
-              <div class="flex items-center gap-2 rounded-xl bg-emerald-50 text-emerald-800 p-3 text-sm font-semibold justify-center">
-                <CheckCircle2 class="h-4 w-4 text-emerald-600" />
-                ¡Estás anotado!
-              </div>
-              <button 
-                type="button" 
-                class="w-full items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98]"
-                onclick={`alert("Tu inscripción ha sido cancelada exitosamente.")`}
-              >
-                Cancelar inscripción
-              </button>
-            </div>
-          ) : (
-            <>
-              {activity.registrationType === 'external' ? (
-                <a 
-                  href={activity.externalUrl || '#'} 
-                  target="_blank" 
-                  class="flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all text-center"
-                >
-                  Registrarse en sitio externo &rarr;
-                </a>
-              ) : (
+          <div id="inscription-container" data-activity-id={activity.id}>
+            {isRegistered ? (
+              <div class="space-y-3">
+                <div class="flex items-center gap-2 rounded-xl bg-emerald-50 text-emerald-800 p-3 text-sm font-semibold justify-center">
+                  <CheckCircle2 class="h-4 w-4 text-emerald-600" />
+                  ¡Estás anotado!
+                </div>
                 <button 
-                  type="button"
-                  disabled={isSoldOut}
-                  class={`w-full flex items-center justify-center rounded-2xl py-3.5 text-sm font-bold text-white shadow-md transition-all ${isSoldOut ? 'bg-zinc-300 shadow-none cursor-not-allowed' : 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.01] active:scale-[0.99]'}`}
-                  onclick={currentUser ? `alert("¡Felicitaciones! Te inscribiste con éxito en esta actividad. Recibirás un recordatorio antes de iniciar.")` : `window.location.href='/login'`}
+                  type="button" 
+                  id="cancel-inscription-btn"
+                  class="w-full items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98] cursor-pointer"
                 >
-                  {isSoldOut ? 'Cupos completos' : 'Registrarme ahora'}
+                  Cancelar inscripción
                 </button>
-              )}
-            </>
-          )}
+              </div>
+            ) : (
+              <>
+                {activity.registrationType === 'external' ? (
+                  <a 
+                    href={activity.externalUrl || '#'} 
+                    target="_blank" 
+                    class="flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all text-center"
+                  >
+                    Registrarse en sitio externo &rarr;
+                  </a>
+                ) : (
+                  <button 
+                    type="button"
+                    id="register-inscription-btn"
+                    disabled={isSoldOut}
+                    class={`w-full flex items-center justify-center rounded-2xl py-3.5 text-sm font-bold text-white shadow-md transition-all ${isSoldOut ? 'bg-zinc-300 shadow-none cursor-not-allowed' : 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.01] active:scale-[0.99] cursor-pointer'}`}
+                  >
+                    {isSoldOut ? 'Cupos completos' : 'Registrarme ahora'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
 
           {activity.status === 'cancelled' && (
             <div class="rounded-xl bg-rose-50 text-rose-800 p-3 text-xs font-semibold text-center">
@@ -618,6 +620,44 @@ const jsonLd = {
           console.error('Error toggling bookmark:', e);
         }
       });
+
+      // Handle Inscription (Register & Cancel)
+      const container = document.getElementById('inscription-container');
+      const activityId = container?.getAttribute('data-activity-id');
+
+      const handleInscription = async (action: 'register' | 'cancel') => {
+        if (!activityId) return;
+
+        try {
+          const res = await fetch('/api/inscripciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activityId, action })
+          });
+
+          const data = await res.json();
+
+          if (res.status === 401) {
+            alert('Debes iniciar sesión para inscribirte en esta actividad.');
+            window.location.href = '/auth/login';
+            return;
+          }
+
+          if (!res.ok) {
+            alert(data.error || 'Error al procesar la inscripción.');
+            return;
+          }
+
+          alert(data.message || 'Operación exitosa.');
+          window.location.reload();
+        } catch (err) {
+          console.error('Error en inscripción:', err);
+          alert('Ocurrió un error inesperado al conectar con el servidor.');
+        }
+      };
+
+      document.getElementById('register-inscription-btn')?.addEventListener('click', () => handleInscription('register'));
+      document.getElementById('cancel-inscription-btn')?.addEventListener('click', () => handleInscription('cancel'));
     </script>
 
     <!-- Similar Activities Section -->
