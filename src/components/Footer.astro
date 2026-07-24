@@ -81,9 +81,13 @@ const year = new Date().getFullYear();
 
     <!-- Bottom Line -->
     <div class="mt-12 border-t border-zinc-200/60 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p class="text-xs text-zinc-500">
-        &copy; {year} Kindora. Todos los derechos reservados. Diseñado en Argentina para toda Latinoamérica.
-      </p>
+      <div class="flex flex-col sm:flex-row items-center gap-2 text-xs text-zinc-500">
+        <span>&copy; {year} Kindora. Todos los derechos reservados.</span>
+        <span class="hidden sm:inline text-zinc-300">•</span>
+        <a href="https://proasc.com" target="_blank" rel="noopener noreferrer" class="font-bold text-zinc-700 hover:text-emerald-600 transition-colors">
+          Powered by proasc.com
+        </a>
+      </div>
       <p class="flex items-center gap-1 text-xs text-zinc-400">
         Hecho con <Heart class="h-3.5 w-3.5 fill-rose-400 text-rose-400" /> para generar impacto positivo.
       </p>
