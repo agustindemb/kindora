@@ -21,7 +21,7 @@ const baseLayout = (content: string) => `
   <div class="container">
     <div class="header">
       <div class="logo">
-        <span class="logo-badge">K</span>Kindora
+        <span class="logo-badge">K</span>indora
       </div>
     </div>
     <div class="body">
