@@ -1,9 +1,25 @@
 ---
 import { Heart, Search, Bell, User, LogOut, LayoutDashboard, PlusCircle, Building2, Eye, Shield } from 'lucide-astro';
+import { db } from '../lib/db/client';
+import { notifications } from '../lib/db/schema';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 const user = Astro.locals.user;
 const activePath = Astro.url.pathname;
 const isAdminUser = user && (user.role === 'admin' || user.realRole === 'admin' || user.isImpersonating);
+
+let hasUnreadNotifications = false;
+if (user) {
+  try {
+    const unreadRes = await db
+      .select({ count: sql`count(${notifications.id})::int` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)));
+    hasUnreadNotifications = (unreadRes[0]?.count || 0) > 0;
+  } catch (e) {
+    hasUnreadNotifications = false;
+  }
+}
 ---
 
 <header class="sticky top-0 z-50 w-full border-b border-zinc-100 bg-white/80 backdrop-blur-md">
@@ -121,7 +137,9 @@ const isAdminUser = user && (user.role === 'admin' || user.realRole === 'admin' 
           <!-- Notification Bell -->
           <a href={user.role === 'organizer' ? '/dashboard/organizador#notificaciones' : '/dashboard/participante#notificaciones'} class="relative p-2 rounded-lg text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all" aria-label="Notificaciones">
             <Bell class="h-5 w-5" />
-            <span class="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            {hasUnreadNotifications && (
+              <span class="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            )}
           </a>
 
           <!-- User Menu Dropdown (Interactive) -->
