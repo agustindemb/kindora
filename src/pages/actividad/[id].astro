@@ -84,51 +84,56 @@ const coverImage = activity.images?.find((img) => img.isCover)?.url
   || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800";
 const secondaryImages = activity.images?.filter((img) => !img.isCover) || [];
 
+// Safe date objects
+const startsAtDate = new Date(activity.startsAt);
+const endsAtDate = new Date(activity.endsAt);
+const createdAtDate = activity.createdAt ? new Date(activity.createdAt) : new Date();
+
 // JSON-LD structured data for Google SEO
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Event",
   "name": activity.title,
-  "description": activity.description,
-  "startDate": activity.startsAt.toISOString(),
-  "endDate": activity.endsAt.toISOString(),
+  "description": activity.description || "",
+  "startDate": startsAtDate.toISOString(),
+  "endDate": endsAtDate.toISOString(),
   "eventStatus": activity.status === 'cancelled' ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
   "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
   "location": {
     "@type": "Place",
-    "name": activity.location.address,
+    "name": activity.location?.address || "A confirmar",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": activity.location.address,
-      "addressLocality": activity.location.city,
-      "addressRegion": activity.location.province,
+      "streetAddress": activity.location?.address || "A confirmar",
+      "addressLocality": activity.location?.city || "Ciudad",
+      "addressRegion": activity.location?.province || "Buenos Aires",
       "addressCountry": "AR"
     },
     "geo": {
       "@type": "GeoCoordinates",
-      "latitude": activity.location.latitude,
-      "longitude": activity.location.longitude
+      "latitude": activity.location?.latitude || -34.6037,
+      "longitude": activity.location?.longitude || -58.3816
     }
   },
   "image": [coverImage],
   "organizer": {
     "@type": "Organization",
-    "name": activity.organization.name,
-    "url": `https://kindora.com.ar/organizacion/${activity.organization.slug}`
+    "name": activity.organization?.name || "Kindora",
+    "url": `https://kindora.com.ar/organizacion/${activity.organization?.slug || 'kindora'}`
   },
   "offers": {
     "@type": "Offer",
-    "price": parseFloat(activity.price) === 0 ? "0" : activity.price,
+    "price": parseFloat(activity.price || "0") === 0 ? "0" : activity.price,
     "priceCurrency": "ARS",
     "availability": isSoldOut ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
-    "validFrom": activity.createdAt.toISOString()
+    "validFrom": createdAtDate.toISOString()
   }
 };
 ---
 
 <Layout 
   title={`${activity.title} | Kindora`} 
-  description={activity.description.substring(0, 160)}
+  description={(activity.description || "").substring(0, 160)}
   image={coverImage}
 >
   <!-- SEO Structuring JSON-LD -->
@@ -230,7 +235,7 @@ const jsonLd = {
             <div>
               <h3 class="text-sm font-bold text-zinc-900">Horario</h3>
               <p class="text-sm text-zinc-600 mt-0.5">{formattedStartTime} hs a {formattedEndTime} hs</p>
-              <p class="text-[10px] text-zinc-400 uppercase mt-0.5">Zona horaria: {activity.timezone.replace('_', ' ')}</p>
+              <p class="text-[10px] text-zinc-400 uppercase mt-0.5">Zona horaria: {(activity.timezone || 'America/Argentina/Buenos_Aires').replace('_', ' ')}</p>
             </div>
           </div>
         </div>
@@ -268,15 +273,15 @@ const jsonLd = {
               <User class="h-5 w-5 text-emerald-600 flex-shrink-0" />
               <div>
                 <p class="text-[10px] font-bold text-zinc-400 uppercase">Coordinador/a</p>
-                <p class="text-sm font-bold text-zinc-800">{activity.contactName || activity.organization.contactPerson || 'No especificado'}</p>
+                <p class="text-sm font-bold text-zinc-800">{activity.contactName || activity.organization?.contactPerson || 'No especificado'}</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
               <Mail class="h-5 w-5 text-emerald-600 flex-shrink-0" />
               <div>
                 <p class="text-[10px] font-bold text-zinc-400 uppercase">Correo</p>
-                <a href={`mailto:${activity.contactEmail || activity.organization.email}`} class="text-sm font-semibold text-emerald-600 hover:underline truncate block max-w-[200px]">
-                  {activity.contactEmail || activity.organization.email || 'No disponible'}
+                <a href={`mailto:${activity.contactEmail || activity.organization?.email || 'hola@kindora.com.ar'}`} class="text-sm font-semibold text-emerald-600 hover:underline truncate block max-w-[200px]">
+                  {activity.contactEmail || activity.organization?.email || 'No disponible'}
                 </a>
               </div>
             </div>
@@ -284,7 +289,7 @@ const jsonLd = {
               <Phone class="h-5 w-5 text-emerald-600 flex-shrink-0" />
               <div>
                 <p class="text-[10px] font-bold text-zinc-400 uppercase">Teléfono / WhatsApp</p>
-                <p class="text-sm font-semibold text-zinc-800">{activity.contactPhone || activity.organization.phone || 'No disponible'}</p>
+                <p class="text-sm font-semibold text-zinc-800">{activity.contactPhone || activity.organization?.phone || 'No disponible'}</p>
               </div>
             </div>
           </div>
@@ -295,12 +300,12 @@ const jsonLd = {
           <h2 class="text-xl font-bold text-zinc-950">¿Dónde nos encontramos?</h2>
           <div class="flex items-center gap-2 text-sm text-zinc-600 mb-3">
             <MapPin class="h-4 w-4 text-emerald-600 flex-shrink-0" />
-            <span>{activity.location.address}, {activity.location.city}, {activity.location.province}</span>
+            <span>{activity.location?.address || 'Ubicación a confirmar'}, {activity.location?.city || 'Ciudad'}, {activity.location?.province || 'Buenos Aires'}</span>
           </div>
           <!-- Single Pin Leaflet Map -->
           <MapComponent 
-            markers={[{ id: activity.id, title: activity.title, lat: activity.location.latitude || -34.6037, lng: activity.location.longitude || -58.3816, address: activity.location.address }]} 
-            center={[activity.location.latitude || -34.6037, activity.location.longitude || -58.3816]} 
+            markers={[{ id: activity.id, title: activity.title, lat: activity.location?.latitude || -34.6037, lng: activity.location?.longitude || -58.3816, address: activity.location?.address || 'Ubicación' }]} 
+            center={[activity.location?.latitude || -34.6037, activity.location?.longitude || -58.3816]} 
             zoom={14} 
             heightClass="h-72" 
           />
