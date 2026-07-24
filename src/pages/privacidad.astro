@@ -1,0 +1,92 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { ShieldCheck, Lock, Eye, FileText, ArrowLeft } from 'lucide-astro';
+
+const lastUpdated = "24 de Julio de 2026";
+---
+
+<Layout title="Política de Privacidad | Kindora">
+  <!-- Header Banner -->
+  <section class="bg-gradient-to-b from-emerald-950 via-zinc-900 to-zinc-950 text-white py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:20px_20px] opacity-15"></div>
+    <div class="relative max-w-4xl mx-auto">
+      <a href="/" class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline mb-4">
+        <ArrowLeft class="h-3.5 w-3.5" />
+        Volver al inicio
+      </a>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold mb-3">
+        <Lock class="h-3.5 w-3.5 text-emerald-400" />
+        Protección de Datos
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Política de Privacidad</h1>
+      <p class="text-zinc-300 text-sm sm:text-base mt-2">
+        En Kindora cuidamos y respetamos tus datos personales. Conocé cómo recopilamos, utilizamos y resguardamos tu información.
+      </p>
+      <span class="text-xs text-zinc-400 block mt-3">Última actualización: {lastUpdated}</span>
+    </div>
+  </section>
+
+  <!-- Content Section -->
+  <main class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 space-y-10 text-zinc-700 leading-relaxed text-sm sm:text-base">
+    
+    <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 flex gap-4 items-start">
+      <ShieldCheck class="h-6 w-6 text-emerald-600 flex-shrink-0 mt-0.5" />
+      <div class="space-y-1 text-xs sm:text-sm text-emerald-900">
+        <h3 class="font-bold">Compromiso con tu privacidad</h3>
+        <p>No vendemos ni comercializamos tus datos personales con terceros. La información recolectada se utiliza únicamente para conectar voluntarios con actividades con impacto social.</p>
+      </div>
+    </div>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight flex items-center gap-2">
+        1. Información que Recopilamos
+      </h2>
+      <p>Para brindarte la mejor experiencia al inscribirte o crear actividades, podemos recolectar:</p>
+      <ul class="list-disc pl-5 space-y-1 text-zinc-600">
+        <li><strong>Información de Cuenta:</strong> Nombre, dirección de correo electrónico, foto de perfil y número de teléfono de contacto opcional.</li>
+        <li><strong>Datos de Organización:</strong> Nombre de la entidad, sitio web, misión, ciudad y canales de contacto públicos.</li>
+        <li><strong>Datos de Uso e Inscripciones:</strong> Historial de actividades agendadas, guardadas y reseñas realizadas.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        2. Uso de la Información
+      </h2>
+      <p>Utilizamos tus datos exclusivamente para los siguientes fines:</p>
+      <ul class="list-disc pl-5 space-y-1 text-zinc-600">
+        <li>Facilitar tu registro e inscripción a voluntariados y talleres inclusivos.</li>
+        <li>Notificarte sobre confirmaciones de asistencia, cambios de horario o avisos de la organización.</li>
+        <li>Calcular métricas de impacto comunitario y mejorar la plataforma de manera continua.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        3. Seguridad de los Datos
+      </h2>
+      <p>
+        Implementamos medidas de seguridad técnicas y organizativas de nivel industrial (encriptación SSL/TLS, autenticación segura Better Auth y almacenamiento en bases de datos resguardadas en Supabase PostgreSQL).
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        4. Tus Derechos de Acceso y Eliminación
+      </h2>
+      <p>
+        En cumplimiento con la Ley de Protección de Datos Personales, podés solicitar en cualquier momento la corrección o eliminación total de tu cuenta e historial directamente desde tu perfil o escribiéndonos a <a href="mailto:privacidad@kindora.proasc.com" class="text-emerald-600 font-semibold underline">privacidad@kindora.proasc.com</a>.
+      </p>
+    </section>
+
+    <section class="space-y-3 pt-6 border-t border-zinc-100">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        5. Contacto
+      </h2>
+      <p class="text-zinc-600">
+        Si tenés alguna consulta o sugerencia sobre nuestras políticas de privacidad, podés comunicarte con nuestro equipo en <a href="mailto:hola@kindora.proasc.com" class="text-emerald-600 font-semibold underline">hola@kindora.proasc.com</a>.
+      </p>
+    </section>
+
+  </main>
+</Layout>

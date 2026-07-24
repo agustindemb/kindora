@@ -1,0 +1,85 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Sparkles, CheckCircle2, Eye, ShieldCheck, ArrowLeft } from 'lucide-astro';
+
+const lastUpdated = "24 de Julio de 2026";
+---
+
+<Layout title="Declaración de Accesibilidad (A11y) | Kindora">
+  <!-- Header Banner -->
+  <section class="bg-gradient-to-b from-emerald-950 via-zinc-900 to-zinc-950 text-white py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:20px_20px] opacity-15"></div>
+    <div class="relative max-w-4xl mx-auto">
+      <a href="/" class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline mb-4">
+        <ArrowLeft class="h-3.5 w-3.5" />
+        Volver al inicio
+      </a>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold mb-3">
+        <Sparkles class="h-3.5 w-3.5 text-emerald-400" />
+        Compromiso de Inclusión
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Declaración de Accesibilidad</h1>
+      <p class="text-zinc-300 text-sm sm:text-base mt-2">
+        En Kindora trabajamos activamente para asegurar que nuestras plataformas digitales sean accesibles para todas las personas, independientemente de sus capacidades.
+      </p>
+      <span class="text-xs text-zinc-400 block mt-3">Última actualización: {lastUpdated}</span>
+    </div>
+  </section>
+
+  <!-- Content Section -->
+  <main class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 space-y-10 text-zinc-700 leading-relaxed text-sm sm:text-base">
+    
+    <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 flex gap-4 items-start">
+      <CheckCircle2 class="h-6 w-6 text-emerald-600 flex-shrink-0 mt-0.5" />
+      <div class="space-y-1 text-xs sm:text-sm text-emerald-900">
+        <h3 class="font-bold">Pautas de Accesibilidad WCAG 2.1 Nivel AA</h3>
+        <p>Adoptamos las Pautas de Accesibilidad para el Contenido Web (WCAG 2.1) del W3C como nuestro estándar de diseño y desarrollo web.</p>
+      </div>
+    </div>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        Medidas de Accesibilidad Implementadas
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="border border-zinc-200 rounded-2xl p-5 bg-white shadow-sm space-y-2">
+          <h3 class="font-bold text-zinc-900 text-base">👁️ Alto Contraste y Tipografía</h3>
+          <p class="text-xs text-zinc-600 leading-relaxed">
+            Utilizamos combinaciones de colores tailoreadas que cumplen con las razones de contraste WCAG AA, y fuentes legibles (Outfit e Inter) con escalado flexible.
+          </p>
+        </div>
+
+        <div class="border border-zinc-200 rounded-2xl p-5 bg-white shadow-sm space-y-2">
+          <h3 class="font-bold text-zinc-900 text-base">⌨️ Navegación por Teclado</h3>
+          <p class="text-xs text-zinc-600 leading-relaxed">
+            Todos los elementos interactivos, botones, filtros y formularios cuentan con indicadores visuales de foco y soporte completo para navegación con tecla Tab y Enter.
+          </p>
+        </div>
+
+        <div class="border border-zinc-200 rounded-2xl p-5 bg-white shadow-sm space-y-2">
+          <h3 class="font-bold text-zinc-900 text-base">🔊 Lectores de Pantalla</h3>
+          <p class="text-xs text-zinc-600 leading-relaxed">
+            Estructuramos nuestras páginas con etiquetas HTML5 semánticas (`main`, `nav`, `header`, `footer`) y atributos `aria-label` para asegurar compatibilidad con NVDA y JAWS.
+          </p>
+        </div>
+
+        <div class="border border-zinc-200 rounded-2xl p-5 bg-white shadow-sm space-y-2">
+          <h3 class="font-bold text-zinc-900 text-base">🧩 Filtros de Adaptabilidad</h3>
+          <p class="text-xs text-zinc-600 leading-relaxed">
+            Cada actividad clasifica explícitamente sus condiciones de accesibilidad (rampas, intérpretes LSA, espacio de calma, pictograms) para facilitar la elección de los usuarios.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="space-y-3 pt-6 border-t border-zinc-100">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        Comentarios y Contacto de Accesibilidad
+      </h2>
+      <p class="text-zinc-600">
+        Buscamos constantemente mejorar la accesibilidad de nuestro sitio. Si encontrás alguna barrera de acceso o necesitás asistencia en algún formulario, escribinos a <a href="mailto:accesibilidad@kindora.proasc.com" class="text-emerald-600 font-semibold underline">accesibilidad@kindora.proasc.com</a>.
+      </p>
+    </section>
+
+  </main>
+</Layout>

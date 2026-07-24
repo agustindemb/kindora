@@ -1,0 +1,81 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { FileText, ShieldCheck, ArrowLeft } from 'lucide-astro';
+
+const lastUpdated = "24 de Julio de 2026";
+---
+
+<Layout title="Términos de Servicio | Kindora">
+  <!-- Header Banner -->
+  <section class="bg-gradient-to-b from-emerald-950 via-zinc-900 to-zinc-950 text-white py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:20px_20px] opacity-15"></div>
+    <div class="relative max-w-4xl mx-auto">
+      <a href="/" class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline mb-4">
+        <ArrowLeft class="h-3.5 w-3.5" />
+        Volver al inicio
+      </a>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold mb-3">
+        <FileText class="h-3.5 w-3.5 text-emerald-400" />
+        Términos Legales
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Términos de Servicio</h1>
+      <p class="text-zinc-300 text-sm sm:text-base mt-2">
+        Te damos la bienvenida a Kindora. Leé detenidamente las condiciones de uso que rigen nuestra plataforma comunitaria.
+      </p>
+      <span class="text-xs text-zinc-400 block mt-3">Última actualización: {lastUpdated}</span>
+    </div>
+  </section>
+
+  <!-- Content Section -->
+  <main class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 space-y-10 text-zinc-700 leading-relaxed text-sm sm:text-base">
+    
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        1. Aceptación de los Términos
+      </h2>
+      <p>
+        Al acceder o utilizar la plataforma Kindora, aceptás cumplir con estos Términos de Servicio y con nuestra Política de Privacidad. Si no estás de acuerdo con alguna de las condiciones, debés abstenerte de utilizar la plataforma.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        2. Uso Responsable de la Comunidad
+      </h2>
+      <p>Kindora es una plataforma orientada a la inclusión y al impacto social. Te comprometés a:</p>
+      <ul class="list-disc pl-5 space-y-1 text-zinc-600">
+        <li>Proporcionar información veraz al registrarte o publicar actividades.</li>
+        <li>Respetar a todos los miembros de la comunidad, evitando contenidos discriminatorios, ofensivos o engañosos.</li>
+        <li>No utilizar la plataforma para fines ilícitos o con intención de perjudicar a terceros.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        3. Publicación de Actividades y Verificación
+      </h2>
+      <p>
+        Las organizaciones registradas son responsables del contenido y la organización de las actividades publicadas. Kindora se reserva el derecho de auditar, verificar y suspender publicaciones que incumplan los estándares éticos o de seguridad de la plataforma.
+      </p>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        4. Limitación de Responsabilidad
+      </h2>
+      <p>
+        Kindora actúa como facilitador digital entre voluntarios y organizaciones. Aunque supervisamos activamente las entidades registradas, no nos responsabilizamos por imprevistos ocurridos de forma presencial durante el desarrollo de una actividad.
+      </p>
+    </section>
+
+    <section class="space-y-3 pt-6 border-t border-zinc-100">
+      <h2 class="text-xl font-bold text-zinc-950 tracking-tight">
+        5. Contacto Legal
+      </h2>
+      <p class="text-zinc-600">
+        Para consultas sobre estos términos, podés escribir a nuestro equipo legal en <a href="mailto:legal@kindora.proasc.com" class="text-emerald-600 font-semibold underline">legal@kindora.proasc.com</a>.
+      </p>
+    </section>
+
+  </main>
+</Layout>
