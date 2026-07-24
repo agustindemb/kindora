@@ -74,6 +74,11 @@ if (Astro.request.method === 'POST') {
       } else {
         const baseUrl = process.env.BETTER_AUTH_URL || Astro.url.origin;
         const { auth } = await import('../lib/auth/auth');
+        // Set intended_role cookie if user selected organization role
+        if (currentRole === 'organizer') {
+          Astro.cookies.set('intended_role', 'organizer', { path: '/', maxAge: 3600 });
+        }
+
         await auth.api.signInMagicLink({
           body: {
             email: emailVal,
@@ -86,6 +91,11 @@ if (Astro.request.method === 'POST') {
     } else if (action === 'social_login') {
       const provider = formData.get('provider') as string;
       const baseUrl = process.env.BETTER_AUTH_URL || Astro.url.origin;
+      
+      if (currentRole === 'organizer') {
+        Astro.cookies.set('intended_role', 'organizer', { path: '/', maxAge: 3600 });
+      }
+
       const { auth } = await import('../lib/auth/auth');
       const response = await auth.api.signInSocial({
         asResponse: true,
@@ -155,16 +165,51 @@ if (Astro.request.method === 'POST') {
 
     <!-- Right Column: Login Forms -->
     <div class="lg:col-span-7 flex items-center justify-center p-8 sm:p-12 md:p-16">
-      <div class="w-full max-w-md space-y-8">
+      <div class="w-full max-w-md space-y-6">
         
+        <!-- Role Selector Tab Switcher -->
+        <div class="grid grid-cols-2 p-1.5 bg-zinc-100/80 rounded-2xl border border-zinc-200/60 text-xs font-bold shadow-inner">
+          <a 
+            href="/login?role=participant" 
+            class={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all ${currentRole !== 'organizer' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+          >
+            <Heart class="h-4 w-4 text-rose-500" />
+            Voluntario / Usuario
+          </a>
+          <a 
+            href="/login?role=organizer" 
+            class={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all ${currentRole === 'organizer' ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+          >
+            <Building2 class="h-4 w-4" />
+            Organización
+          </a>
+        </div>
+
         <!-- Header -->
         <div class="space-y-2">
-          <h2 class="text-3xl font-black text-zinc-900 tracking-tight">
-            Ingresá a la comunidad
-          </h2>
-          <p class="text-sm text-zinc-500">
-            Descubrí y participá en actividades con impacto social.
-          </p>
+          {currentRole === 'organizer' ? (
+            <>
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                <Building2 class="h-3.5 w-3.5" />
+                Acceso para Organizaciones
+              </div>
+              <h2 class="text-3xl font-black text-zinc-900 tracking-tight">
+                Ingresá como Organización
+              </h2>
+              <p class="text-sm text-zinc-500">
+                Publicá voluntariados, gestioná inscriptos y medí el impacto social de tu entidad.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 class="text-3xl font-black text-zinc-900 tracking-tight">
+                Ingresá a la comunidad
+              </h2>
+              <p class="text-sm text-zinc-500">
+                Descubrí y participá en actividades con impacto social.
+              </p>
+            </>
+          )}
         </div>
 
         {errorMessage && (

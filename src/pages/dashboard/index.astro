@@ -1,12 +1,24 @@
 ---
-// /dashboard — secure role-based routing page
-// Reads the fresh role from the DB (via middleware) and redirects accordingly.
-// Nobody can "trick" this by changing a URL — the role comes from the DB.
+import { db } from '../../lib/db/client';
+import { user as userTable } from '../../lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 const user = Astro.locals.user;
 
 if (!user) {
   return Astro.redirect('/login');
+}
+
+const intendedRoleCookie = Astro.cookies.get('intended_role')?.value;
+if (intendedRoleCookie === 'organizer' && user.role !== 'admin') {
+  if (user.role !== 'organizer') {
+    try {
+      await db.update(userTable).set({ role: 'organizer', updatedAt: new Date() }).where(eq(userTable.id, user.id));
+      user.role = 'organizer';
+    } catch(e){}
+  }
+  Astro.cookies.delete('intended_role', { path: '/' });
+  return Astro.redirect('/dashboard/organizador');
 }
 
 if (user.role === 'admin') {
