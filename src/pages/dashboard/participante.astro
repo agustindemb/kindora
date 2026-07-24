@@ -47,6 +47,10 @@ if (Astro.request.method === 'POST') {
       currentUser.name = name;
       currentUser.phone = phone;
       successMsg = '¡Tu perfil se actualizó correctamente!';
+    } else if (action === 'switch_to_organizer') {
+      await userRepository.update(currentUser.id, { role: 'organizer' });
+      currentUser.role = 'organizer';
+      return Astro.redirect('/dashboard/organizador');
     }
   } catch (err: any) {
     errorMsg = err.message || 'Error al guardar los datos.';
@@ -282,6 +286,19 @@ if (Astro.request.method === 'POST') {
               Guardar cambios
             </button>
           </form>
+
+          <!-- Account Type Switcher -->
+          <div class="pt-6 border-t border-zinc-100 max-w-lg">
+            <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">¿Querés publicar actividades?</h3>
+            <p class="text-xs text-zinc-500 mb-3 leading-relaxed">Si representás a una ONG, fundación o grupo comunitario, podés convertir tu cuenta en Organización para publicar actividades e inscriptos.</p>
+            <form method="POST" class="m-0">
+              <input type="hidden" name="action" value="switch_to_organizer" />
+              <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all cursor-pointer">
+                <Building2 class="h-4 w-4 text-emerald-400" />
+                Convertir mi cuenta a Organización &rarr;
+              </button>
+            </form>
+          </div>
         </section>
 
         <!-- Tab 4: Notificaciones -->
