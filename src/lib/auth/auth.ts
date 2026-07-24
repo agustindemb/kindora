@@ -14,6 +14,12 @@ export const auth = betterAuth({
     provider: "pg",
   }),
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3582",
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google", "facebook"],
+    },
+  },
   user: {
     fields: {
       role: {
