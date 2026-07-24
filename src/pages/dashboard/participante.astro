@@ -13,37 +13,50 @@ if (!currentUser) {
   return Astro.redirect('/login');
 }
 
+const userName = currentUser.name || 'Usuario';
+const userEmail = currentUser.email || '';
+const userImage = currentUser.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(userName)}`;
+
 // Fetch participant data safely
 let inscriptionsList: any[] = [];
 let bookmarkedActivities: any[] = [];
 let notificationsList: any[] = [];
 
 try {
-  inscriptionsList = (await activityRepository.getUserInscriptions(currentUser.id)).filter(ins => ins && ins.activity);
+  const rawIns = await activityRepository.getUserInscriptions(currentUser.id);
+  if (Array.isArray(rawIns)) {
+    inscriptionsList = rawIns.filter(ins => ins && ins.activity);
+  }
 } catch(e) {
   console.warn("[Participante] Error fetching user inscriptions:", e);
 }
 
 try {
-  bookmarkedActivities = await activityRepository.getBookmarkedActivities(currentUser.id);
+  const rawBookmarks = await activityRepository.getBookmarkedActivities(currentUser.id);
+  if (Array.isArray(rawBookmarks)) {
+    bookmarkedActivities = rawBookmarks.filter(Boolean);
+  }
 } catch(e) {
   console.warn("[Participante] Error fetching bookmarked activities:", e);
 }
 
 try {
-  notificationsList = await notificationService.getUserNotifications(currentUser.id);
+  const rawNotifs = await notificationService.getUserNotifications(currentUser.id);
+  if (Array.isArray(rawNotifs)) {
+    notificationsList = rawNotifs.filter(Boolean);
+  }
 } catch(e) {
   console.warn("[Participante] Error fetching user notifications:", e);
 }
 
 // Split registered activities
 const now = new Date();
-const upcomingInscriptions = inscriptionsList.filter((ins) => ins?.activity?.startsAt && new Date(ins.activity.startsAt) > now && ins.status === 'registered');
-const pastInscriptions = inscriptionsList.filter((ins) => ins?.activity?.startsAt && (new Date(ins.activity.startsAt) <= now || ins.status === 'attended'));
+const upcomingInscriptions = (inscriptionsList || []).filter((ins) => ins?.activity?.startsAt && new Date(ins.activity.startsAt) > now && ins.status === 'registered');
+const pastInscriptions = (inscriptionsList || []).filter((ins) => ins?.activity?.startsAt && (new Date(ins.activity.startsAt) <= now || ins.status === 'attended'));
 
 // Volunteer Impact Profile Metrics
-const totalHours = inscriptionsList.length * 2;
-const causesSupported = Array.from(new Set(inscriptionsList.map(ins => ins?.activity?.category?.name).filter(Boolean)));
+const totalHours = (inscriptionsList || []).length * 2;
+const causesSupported = Array.from(new Set((inscriptionsList || []).map(ins => ins?.activity?.category?.name).filter(Boolean)));
 
 // Handle Profile Updates POST
 let successMsg = '';
@@ -92,8 +105,8 @@ if (Astro.request.method === 'POST') {
       
       <div class="relative flex items-center gap-4">
         <img 
-          src={currentUser.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser.name}`} 
-          alt={currentUser.name} 
+          src={userImage} 
+          alt={userName} 
           class="h-16 w-16 md:h-20 md:w-20 rounded-full object-cover border-2 border-emerald-400/50 shadow-md"
           onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';"
         />
@@ -104,8 +117,8 @@ if (Astro.request.method === 'POST') {
             </span>
             <ShieldCheck class="h-4 w-4 text-emerald-400" title="Perfil Verificado" />
           </div>
-          <h1 class="text-2xl md:text-3xl font-black tracking-tight leading-none mb-1 text-white">{currentUser.name}</h1>
-          <p class="text-xs text-zinc-400">{currentUser.email}</p>
+          <h1 class="text-2xl md:text-3xl font-black tracking-tight leading-none mb-1 text-white">{userName}</h1>
+          <p class="text-xs text-zinc-400">{userEmail}</p>
         </div>
       </div>
 
