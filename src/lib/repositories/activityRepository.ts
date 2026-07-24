@@ -109,61 +109,88 @@ export const activityRepository = {
         .where(and(eq(activities.id, id), isNull(activities.deletedAt)))
         .limit(1);
 
-      if (actResult.length === 0) return null;
+      if (actResult.length === 0) {
+        // Fallback to active mock store
+        const act = activeActivities.find((a) => a.id === id && !a.deletedAt);
+        if (!act) return null;
+
+        const location = activeLocations.find((l) => l.id === act.locationId) || activeLocations[0];
+        const category = activeCategories.find((c) => c.id === act.categoryId) || activeCategories[0];
+        const org = activeOrganizations.find((o) => o.id === act.organizationId) || activeOrganizations[0];
+
+        return {
+          ...act,
+          location,
+          category,
+          organization: org,
+          images: activeActivityImages.filter((img) => img.activityId === id) as any[],
+          tags: activeActivityTags.filter((t) => t.activityId === id).map((t) => activeTags.find((tag) => tag.id === t.tagId)).filter(Boolean) as any[],
+          accessibility: activeActivityAccessibility.filter((a) => a.activityId === id).map((a) => activeAccessibility.find((f) => f.id === a.featureId)).filter(Boolean) as any[],
+          confirmedRegistrations: activeInscriptions.filter((ins) => ins.activityId === id && ins.status === "registered").length,
+        };
+      }
 
       const { activity, location, category, org } = actResult[0];
 
-      const imagesList = await db
-        .select()
-        .from(activityImages)
-        .where(eq(activityImages.activityId, id))
-        .orderBy(asc(activityImages.order));
+      let imagesList: any[] = [];
+      try {
+        imagesList = await db
+          .select()
+          .from(activityImages)
+          .where(eq(activityImages.activityId, id))
+          .orderBy(asc(activityImages.order));
+      } catch (e) {}
 
-      const tagsList = await db
-        .select({ tag: tags })
-        .from(activityTags)
-        .innerJoin(tags, eq(activityTags.tagId, tags.id))
-        .where(eq(activityTags.activityId, id));
+      let tagsList: any[] = [];
+      try {
+        const rawTags = await db
+          .select({ tag: tags })
+          .from(activityTags)
+          .innerJoin(tags, eq(activityTags.tagId, tags.id))
+          .where(eq(activityTags.activityId, id));
+        tagsList = rawTags.map((t) => t.tag);
+      } catch (e) {}
 
-      const a11yList = await db
-        .select({ feat: accessibilityFeatures })
-        .from(activityAccessibility)
-        .innerJoin(accessibilityFeatures, eq(activityAccessibility.featureId, accessibilityFeatures.id))
-        .where(eq(activityAccessibility.activityId, id));
+      let a11yList: any[] = [];
+      try {
+        const rawA11y = await db
+          .select({ feat: accessibilityFeatures })
+          .from(activityAccessibility)
+          .innerJoin(accessibilityFeatures, eq(activityAccessibility.featureId, accessibilityFeatures.id))
+          .where(eq(activityAccessibility.activityId, id));
+        a11yList = rawA11y.map((a) => a.feat);
+      } catch (e) {}
 
-      const insResults = await db
-        .select({ count: sql<number>`count(${inscriptions.id})::int` })
-        .from(inscriptions)
-        .where(
-          and(
-            eq(inscriptions.activityId, id),
-            eq(inscriptions.status, "registered")
-          )
-        );
+      let confirmedCount = 0;
+      try {
+        const insResults = await db
+          .select({ count: sql<number>`count(${inscriptions.id})::int` })
+          .from(inscriptions)
+          .where(
+            and(
+              eq(inscriptions.activityId, id),
+              eq(inscriptions.status, "registered")
+            )
+          );
+        confirmedCount = insResults[0]?.count || 0;
+      } catch (e) {}
 
       return {
         ...activity,
-        location,
-        category,
-        organization: org,
+        location: location || { id: "loc-default", address: "A confirmar", city: "Ciudad", province: "Buenos Aires", country: "Argentina", latitude: -34.6037, longitude: -58.3816 },
+        category: category || { id: "cat-default", name: "General", slug: "general", description: "", icon: "Heart" },
+        organization: org || { id: "org-default", name: "Organización", slug: "organizacion", description: "", email: "contacto@kindora.com.ar", phone: "", logo: "", isVerified: false, verificationLevel: "none" },
         images: imagesList,
-        tags: tagsList.map((t) => t.tag),
-        accessibility: a11yList.map((a) => a.feat),
-        confirmedRegistrations: insResults[0]?.count || 0,
+        tags: tagsList,
+        accessibility: a11yList,
+        confirmedRegistrations: confirmedCount,
       };
     } catch (error) {
-      console.warn("DB Connection failed, using mock activities fallback.");
+      console.warn("DB Error in findById, attempting mock fallback:", error);
       const act = activeActivities.find((a) => a.id === id && !a.deletedAt);
       if (!act) return null;
-
       const location = activeLocations.find((l) => l.id === act.locationId) || activeLocations[0];
       const category = activeCategories.find((c) => c.id === act.categoryId) || activeCategories[0];
-      const organization = activeOrganizations.find((o) => o.id === act.organizationId) || activeOrganizations[0];
-
-      const images = activeActivityImages.filter((img) => img.activityId === id);
-      const linkedTags = activeActivityTags.filter((t) => t.activityId === id).map((t) => activeTags.find((tag) => tag.id === t.tagId)).filter(Boolean) as any[];
-      const linkedA11y = activeActivityAccessibility.filter((a) => a.activityId === id).map((a) => activeAccessibility.find((feat) => feat.id === a.featureId)).filter(Boolean) as any[];
-      const confirmed = activeInscriptions.filter((ins) => ins.activityId === id && ins.status === "registered").length;
 
       return {
         ...act,

@@ -22,8 +22,8 @@ if (!activity) {
   return Astro.redirect('/404');
 }
 
-// SEO Redirect: if the slug in the URL is old or incorrect, redirect 301
-if (slugInUrl !== activity.slug) {
+// SEO Redirect: if the slug in the URL is old or incorrect, redirect 301 (only if slug actually changed)
+if (slugInUrl && activity.slug && slugInUrl !== activity.slug && !rawId.endsWith(activity.slug)) {
   return Astro.redirect(`/actividad/${activity.id}-${activity.slug}`, 301);
 }
 
