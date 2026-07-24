@@ -7,6 +7,8 @@ import { userRepository } from '../../lib/repositories/userRepository';
 import { notificationService } from '../../services/notificationService';
 import { Calendar, Heart, User, Bell, Settings, Star, AlertCircle, Award, Clock, ShieldCheck, Share2, Trash2, Building2 } from 'lucide-astro';
 
+import { getUserAvatar } from '../../utils/avatar';
+
 const currentUser = Astro.locals.user;
 
 if (!currentUser) {
@@ -15,7 +17,7 @@ if (!currentUser) {
 
 const userName = currentUser.name || 'Usuario';
 const userEmail = currentUser.email || '';
-const userImage = currentUser.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(userName)}`;
+const userImage = getUserAvatar(currentUser);
 
 // Fetch participant data safely
 let inscriptionsList: any[] = [];
