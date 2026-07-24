@@ -79,6 +79,8 @@ export const organizations = pgTable("organizations", {
   verifiedAt: timestamp("verifiedAt"),
   verifiedBy: text("verifiedBy").references(() => user.id),
   verificationLevel: text("verificationLevel").default("none").notNull(), // none, verified, official, municipality, government, school, foundation
+  volunteerMode: text("volunteerMode").default("immediate").notNull(), // immediate, approval_required
+  volunteerFormSchema: text("volunteerFormSchema"), // JSON string array of custom form questions
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   deletedAt: timestamp("deletedAt"),
 });
@@ -213,7 +215,8 @@ export const inscriptions = pgTable("inscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   activityId: uuid("activityId").notNull().references(() => activities.id, { onDelete: "cascade" }),
   userId: text("userId").notNull().references(() => user.id, { onDelete: "cascade" }),
-  status: text("status").default("registered").notNull(), // registered, cancelled, attended
+  status: text("status").default("registered").notNull(), // registered, cancelled, attended, volunteer, volunteer_pending, volunteer_approved, volunteer_rejected
+  volunteerAnswers: text("volunteerAnswers"), // JSON string object of custom form responses
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

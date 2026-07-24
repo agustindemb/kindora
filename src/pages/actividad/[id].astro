@@ -34,10 +34,13 @@ try {
   activityRepository.incrementViews(activity.id, currentUser?.id);
 } catch(e) {}
 
-// Check if user is registered in this activity
 let isRegistered = false;
 let hasAttended = false;
 let isVolunteering = false;
+let isVolunteerPending = false;
+let isVolunteerApproved = false;
+let isVolunteerRejected = false;
+
 if (currentUser) {
   try {
     const userInscriptions = await activityRepository.getUserInscriptions(currentUser.id);
@@ -45,7 +48,10 @@ if (currentUser) {
     if (currentIns) {
       isRegistered = currentIns.status === 'registered';
       hasAttended = currentIns.status === 'attended';
-      isVolunteering = currentIns.status === 'volunteer';
+      isVolunteerPending = currentIns.status === 'volunteer_pending';
+      isVolunteerApproved = currentIns.status === 'volunteer_approved' || currentIns.status === 'volunteer';
+      isVolunteerRejected = currentIns.status === 'volunteer_rejected';
+      isVolunteering = isVolunteerPending || isVolunteerApproved;
     }
   } catch(e) {}
 }
@@ -488,7 +494,20 @@ const jsonLd = {
                   Cancelar inscripción
                 </button>
               </div>
-            ) : isVolunteering ? (
+            ) : isVolunteerPending ? (
+              <div class="space-y-3">
+                <div class="flex items-center gap-2 rounded-xl bg-amber-50 text-amber-800 p-3 text-xs font-semibold justify-center border border-amber-200">
+                  ⏳ Tu postulación como voluntario/a está en revisión
+                </div>
+                <button 
+                  type="button" 
+                  id="cancel-inscription-btn"
+                  class="w-full items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  Cancelar postulación
+                </button>
+              </div>
+            ) : isVolunteerApproved ? (
               <div class="space-y-3">
                 <div class="flex items-center gap-2 rounded-xl bg-violet-50 text-violet-800 p-3 text-sm font-semibold justify-center">
                   🌱 ¡Estás registrado/a como voluntario/a!
@@ -500,6 +519,12 @@ const jsonLd = {
                 >
                   Cancelar voluntariado
                 </button>
+              </div>
+            ) : isVolunteerRejected ? (
+              <div class="space-y-3">
+                <div class="flex items-center gap-2 rounded-xl bg-rose-50 text-rose-800 p-3 text-xs font-semibold justify-center border border-rose-200">
+                  ❌ Tu postulación como voluntario/a no fue aprobada
+                </div>
               </div>
             ) : (
               <>
@@ -695,9 +720,81 @@ const jsonLd = {
         }
       };
 
+      // Volunteer Application Flow with Custom Form Modal
+      const volunteerModal = document.getElementById('volunteer-app-modal');
+      const volunteerForm = document.getElementById('volunteer-app-form');
+      const questionsBox = document.getElementById('volunteer-questions-box');
+      const closeVolunteerModalBtns = [
+        document.getElementById('close-volunteer-app-modal-btn'),
+        document.getElementById('close-volunteer-app-modal-btn-2'),
+      ];
+
+      const rawQuestions = `{activity.organization?.volunteerFormSchema || '[]'}`;
+      let customQuestions: any[] = [];
+      try { customQuestions = JSON.parse(rawQuestions); } catch(e) {}
+
       document.getElementById('register-inscription-btn')?.addEventListener('click', () => handleInscription('register'));
-      document.getElementById('volunteer-btn')?.addEventListener('click', () => handleInscription('volunteer'));
       document.getElementById('cancel-inscription-btn')?.addEventListener('click', () => handleInscription('cancel'));
+
+      document.getElementById('volunteer-btn')?.addEventListener('click', () => {
+        if (customQuestions.length > 0) {
+          // Render questions in modal
+          if (questionsBox) {
+            questionsBox.innerHTML = '';
+            customQuestions.forEach((q, idx) => {
+              const item = document.createElement('div');
+              item.className = 'space-y-1.5';
+              const reqText = q.required ? '<span class="text-rose-500">*</span>' : '';
+              
+              if (q.type === 'textarea') {
+                item.innerHTML = `
+                  <label class="block text-xs font-bold text-zinc-700">${q.label || `Pregunta ${idx+1}`} ${reqText}</label>
+                  <textarea name="q_${idx}" data-label="${q.label || `Pregunta ${idx+1}`}" rows="3" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-violet-600 font-medium" ${q.required ? 'required' : ''}></textarea>
+                `;
+              } else if (q.type === 'checkbox') {
+                item.innerHTML = `
+                  <label class="flex items-center gap-2.5 p-3 rounded-xl border border-zinc-200 bg-zinc-50 cursor-pointer">
+                    <input type="checkbox" name="q_${idx}" data-label="${q.label || `Pregunta ${idx+1}`}" class="rounded text-violet-600 focus:ring-violet-500" ${q.required ? 'required' : ''} />
+                    <span class="text-xs font-bold text-zinc-800">${q.label || `Pregunta ${idx+1}`} ${reqText}</span>
+                  </label>
+                `;
+              } else {
+                item.innerHTML = `
+                  <label class="block text-xs font-bold text-zinc-700">${q.label || `Pregunta ${idx+1}`} ${reqText}</label>
+                  <input type="text" name="q_${idx}" data-label="${q.label || `Pregunta ${idx+1}`}" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-violet-600 font-medium" ${q.required ? 'required' : ''} />
+                `;
+              }
+              questionsBox.appendChild(item);
+            });
+          }
+          volunteerModal?.classList.remove('hidden');
+        } else {
+          // Direct volunteer submission if no custom questions
+          handleInscription('volunteer');
+        }
+      });
+
+      closeVolunteerModalBtns.forEach(b => b?.addEventListener('click', () => volunteerModal?.classList.add('hidden')));
+
+      if (volunteerForm) {
+        volunteerForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const answers: Record<string, any> = {};
+          const inputs = volunteerForm.querySelectorAll('[data-label]');
+          inputs.forEach((inp: any) => {
+            const label = inp.getAttribute('data-label');
+            if (label) {
+              if (inp.type === 'checkbox') {
+                answers[label] = inp.checked;
+              } else {
+                answers[label] = inp.value;
+              }
+            }
+          });
+          volunteerModal?.classList.add('hidden');
+          handleInscription('volunteer', answers);
+        });
+      }
 
       // Handle Review Form Submission
       const reviewForm = document.getElementById('activity-review-form');
@@ -730,6 +827,34 @@ const jsonLd = {
         });
       }
     </script>
+
+    <!-- Volunteer Application Modal HTML -->
+    <div id="volunteer-app-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden backdrop-blur-sm">
+      <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+          <div>
+            <h3 class="text-lg font-bold text-zinc-950">Postulación de Voluntariado</h3>
+            <p class="text-xs text-zinc-500">{activity.organization?.name} • {activity.title}</p>
+          </div>
+          <button type="button" id="close-volunteer-app-modal-btn" class="text-zinc-400 hover:text-zinc-600 font-bold text-xl p-1">&times;</button>
+        </div>
+
+        <form id="volunteer-app-form" class="space-y-4">
+          <div id="volunteer-questions-box" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+            <!-- Questions dynamically generated -->
+          </div>
+
+          <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-3">
+            <button type="button" id="close-volunteer-app-modal-btn-2" class="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50">
+              Cancelar
+            </button>
+            <button type="submit" class="rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-violet-100">
+              Enviar Postulación
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Similar Activities Section -->
     {filteredSimilar.length > 0 && (

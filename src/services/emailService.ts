@@ -109,4 +109,14 @@ export const emailService = {
       html,
     });
   },
+
+  async sendVolunteerStatusUpdate(userEmail: string, userName: string, activityTitle: string, status: 'approved' | 'rejected') {
+    const html = emailTemplate.volunteerStatusChanged({ userName, activityTitle, status });
+    await this.sendEmail({
+      to: userEmail,
+      subject: status === 'approved' ? `¡Solicitud de voluntariado aprobada en ${activityTitle}! 🌱` : `Novedades sobre tu postulación en ${activityTitle}`,
+      type: "activity_volunteer",
+      html,
+    });
+  },
 };

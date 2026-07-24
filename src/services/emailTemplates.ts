@@ -183,9 +183,24 @@ export const emailTemplate = {
         <p style="margin: 4px 0; font-size: 14px; color: #52525b;"><strong>Correo:</strong> <a href="mailto:${info.volunteerEmail}" style="color: #10b981;">${info.volunteerEmail}</a></p>
       </div>
 
-      <p>Podés contactarle directamente o gestionar los voluntarios desde tu panel de organización.</p>
+      <p>Podés revisar sus respuestas y gestionar la aprobación desde tu panel de organización.</p>
       <div style="text-align: center; margin-top: 24px;">
         <a href="https://kindora.com.ar/dashboard/organizador" class="btn">Ir al Panel de Organización</a>
+      </div>
+    `);
+  },
+
+  volunteerStatusChanged({ userName, activityTitle, status }: { userName: string; activityTitle: string; status: 'approved' | 'rejected' }) {
+    const isApproved = status === 'approved';
+    return baseLayout(`
+      <h2 style="font-size: 22px; font-weight: 800; margin-top: 0; color: ${isApproved ? '#064e3b' : '#b91c1c'};">
+        ${isApproved ? '¡Solicitud de voluntariado aprobada! 🌱' : 'Actualización de solicitud de voluntariado'}
+      </h2>
+      <p>Hola <strong>${userName}</strong>,</p>
+      <p>La organización ha ${isApproved ? '<strong>aprobado tu postulación</strong> como voluntario/a' : 'revisado tu postulación como voluntario/a'} para la actividad <strong>${activityTitle}</strong>.</p>
+      ${isApproved ? '<p>¡Muchas gracias por tu compromiso! El equipo organizador se comunicará con vos para coordinar los próximos pasos.</p>' : '<p>En esta ocasión la organización no ha podido procesar la postulación, pero te invitamos a seguir sumándote a otras iniciativas comunitarias.</p>'}
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="https://kindora.com.ar/dashboard/participante" class="btn">Ir a Mi Panel de Participante</a>
       </div>
     `);
   },

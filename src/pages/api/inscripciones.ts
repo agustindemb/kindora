@@ -49,8 +49,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     } else if (action === 'volunteer') {
-      // Register as volunteer (uses a different status)
-      await activityRepository.registerParticipant(activityId, user.id, 'volunteer');
+      const volunteerAnswers = body.answers ? JSON.stringify(body.answers) : null;
+      const mode = activity.organization?.volunteerMode || 'immediate';
+      const status = mode === 'approval_required' ? 'volunteer_pending' : 'volunteer_approved';
+
+      // Register as volunteer with volunteerAnswers
+      await activityRepository.registerParticipant(activityId, user.id, status, volunteerAnswers || undefined);
 
       // Send volunteer confirmation email to the participant
       if (user.email) {
@@ -80,8 +84,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
         JSON.stringify({ 
           success: true, 
           isVolunteering: true, 
-          message: '¡Gracias por ofrecerte como voluntario/a! El equipo organizador te contactará pronto.' 
+          status,
+          message: status === 'volunteer_pending' 
+            ? '¡Tu postulación ha sido enviada! La organización revisará tu formulario y te avisará pronto.' 
+            : '¡Gracias por ofrecerte como voluntario/a! Tu participación ha sido registrada.' 
         }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    } else if (action === 'review_volunteer') {
+      const { inscriptionId, status: newStatus } = body;
+      if (!inscriptionId || !['volunteer_approved', 'volunteer_rejected'].includes(newStatus)) {
+        return new Response(
+          JSON.stringify({ error: 'Parámetros inválidos para la revisión.' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await db.update(inscriptions).set({ status: newStatus }).where(eq(inscriptions.id, inscriptionId));
+
+      return new Response(
+        JSON.stringify({ success: true, status: newStatus, message: 'Estado de postulación actualizado.' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     } else {

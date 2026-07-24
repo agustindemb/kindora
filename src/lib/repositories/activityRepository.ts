@@ -693,11 +693,11 @@ export const activityRepository = {
     }
   },
 
-  async registerParticipant(activityId: string, userId: string, status = "registered"): Promise<any> {
+  async registerParticipant(activityId: string, userId: string, status = "registered", volunteerAnswers?: string): Promise<any> {
     try {
       const results = await db
         .insert(inscriptions)
-        .values({ activityId, userId, status })
+        .values({ activityId, userId, status, volunteerAnswers: volunteerAnswers || null })
         .returning();
 
       return results[0];
@@ -708,6 +708,7 @@ export const activityRepository = {
         activityId,
         userId,
         status,
+        volunteerAnswers: volunteerAnswers || null,
         createdAt: new Date(),
       };
       activeInscriptions.push(newIns);

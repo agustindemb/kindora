@@ -104,6 +104,8 @@ if (Astro.request.method === 'POST') {
       const phone = formData.get('phone') as string;
       const whatsapp = formData.get('whatsapp') as string;
       const contactPerson = formData.get('contactPerson') as string;
+      const volunteerMode = (formData.get('volunteerMode') as string) || 'immediate';
+      const volunteerFormSchema = (formData.get('volunteerFormSchema') as string) || null;
 
       await organizationRepository.update(org.id, {
         name,
@@ -114,9 +116,11 @@ if (Astro.request.method === 'POST') {
         phone,
         whatsapp,
         contactPerson,
+        volunteerMode,
+        volunteerFormSchema,
       });
 
-      successMsg = '¡Los datos de la organización se actualizaron correctamente!';
+      successMsg = '¡Los datos y configuración de la organización se actualizaron correctamente!';
       
       // Update values for local render
       org.name = name;
@@ -127,6 +131,17 @@ if (Astro.request.method === 'POST') {
       org.phone = phone;
       org.whatsapp = whatsapp;
       org.contactPerson = contactPerson;
+      (org as any).volunteerMode = volunteerMode;
+      (org as any).volunteerFormSchema = volunteerFormSchema;
+
+    } else if (action === 'review_volunteer') {
+      const insId = formData.get('inscriptionId') as string;
+      const newStatus = formData.get('status') as string;
+      if (insId && ['volunteer_approved', 'volunteer_rejected'].includes(newStatus)) {
+        await db.update(schema.inscriptions).set({ status: newStatus }).where(eq(schema.inscriptions.id, insId));
+        successMsg = newStatus === 'volunteer_approved' ? '¡Voluntario/a aprobado/a correctamente!' : 'Postulación de voluntario/a rechazada.';
+        return Astro.redirect('/dashboard/organizador');
+      }
 
     } else if (action === 'approve_inscription') {
       const insId = formData.get('inscriptionId') as string;
@@ -479,20 +494,24 @@ import * as schema from '../../../lib/db/schema';
                               {new Date(ins.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                             </td>
                             <td class="px-6 py-4 text-xs">
-                              <span class={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-bold ${
+                              <span class={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-bold ${
                                 ins.status === 'registered' ? 'bg-emerald-50 text-emerald-700' :
-                                ins.status === 'volunteer' ? 'bg-violet-50 text-violet-700' :
+                                ins.status === 'volunteer_pending' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+                                ins.status === 'volunteer_approved' || ins.status === 'volunteer' ? 'bg-violet-50 text-violet-700 border border-violet-200' :
+                                ins.status === 'volunteer_rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
                                 ins.status === 'attended' ? 'bg-blue-50 text-blue-700' :
                                 'bg-zinc-100 text-zinc-500'
                               }`}>
                                 {ins.status === 'registered' ? '✅ Participante' :
-                                 ins.status === 'volunteer' ? '🌱 Voluntario/a' :
+                                 ins.status === 'volunteer_pending' ? '⏳ Pendiente de revisión' :
+                                 ins.status === 'volunteer_approved' || ins.status === 'volunteer' ? '🌱 Voluntario/a Aprobado/a' :
+                                 ins.status === 'volunteer_rejected' ? '❌ Postulación Rechazada' :
                                  ins.status === 'attended' ? '🎯 Asistió' :
                                  'Cancelado'}
                               </span>
                             </td>
                             <td class="px-6 py-4">
-                              <div class="flex items-center gap-3">
+                              <div class="flex flex-wrap items-center gap-2">
                                 {ins.status === 'registered' && (
                                   <form method="POST" class="m-0">
                                     <input type="hidden" name="action" value="approve_inscription" />
@@ -503,11 +522,46 @@ import * as schema from '../../../lib/db/schema';
                                     </button>
                                   </form>
                                 )}
-                                {ins.status === 'volunteer' && ins.user?.email && (
-                                  <a href={`mailto:${ins.user.email}?subject=Gracias por ser voluntario/a en ${ins.activityTitle}`} class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline">
+
+                                {ins.status === 'volunteer_pending' && (
+                                  <div class="flex items-center gap-1.5">
+                                    <form method="POST" class="m-0">
+                                      <input type="hidden" name="action" value="review_volunteer" />
+                                      <input type="hidden" name="inscriptionId" value={ins.id} />
+                                      <input type="hidden" name="status" value="volunteer_approved" />
+                                      <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 text-xs font-bold shadow-sm">
+                                        Aprobar
+                                      </button>
+                                    </form>
+                                    <form method="POST" class="m-0" onsubmit="return confirm('¿Seguro/a de rechazar esta postulación?');">
+                                      <input type="hidden" name="action" value="review_volunteer" />
+                                      <input type="hidden" name="inscriptionId" value={ins.id} />
+                                      <input type="hidden" name="status" value="volunteer_rejected" />
+                                      <button type="submit" class="rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 px-2 py-1 text-xs font-bold">
+                                        Rechazar
+                                      </button>
+                                    </form>
+                                  </div>
+                                )}
+
+                                {ins.volunteerAnswers && (
+                                  <button 
+                                    type="button" 
+                                    data-inspect-answers={ins.volunteerAnswers}
+                                    data-volunteer-name={ins.user?.name}
+                                    data-activity-title={ins.activityTitle}
+                                    class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline flex items-center gap-0.5"
+                                  >
+                                    <span>📋 Ver Respuestas</span>
+                                  </button>
+                                )}
+
+                                {(ins.status === 'volunteer_approved' || ins.status === 'volunteer') && ins.user?.email && (
+                                  <a href={`mailto:${ins.user.email}?subject=Coordinación de voluntariado en ${ins.activityTitle}`} class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline">
                                     Contactar
                                   </a>
                                 )}
+
                                 <form method="POST" class="m-0" onsubmit="return confirm('¿Estás seguro/a de quitar a esta persona de la actividad?');">
                                   <input type="hidden" name="action" value="remove_inscription" />
                                   <input type="hidden" name="inscriptionId" value={ins.id} />
@@ -608,6 +662,48 @@ import * as schema from '../../../lib/db/schema';
                     <label for="conf-whatsapp" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">WhatsApp de consultas</label>
                     <input type="tel" id="conf-whatsapp" name="whatsapp" value={org.whatsapp || ''} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
                   </div>
+
+                  <!-- Volunteer Admission Mode & Custom Form Builder -->
+                  <div class="sm:col-span-2 space-y-4 pt-6 border-t border-zinc-100">
+                    <div>
+                      <h3 class="text-sm font-bold text-zinc-900 uppercase tracking-wider">Admisión de Voluntarios y Formulario</h3>
+                      <p class="text-xs text-zinc-500">Definí si los voluntarios ingresan automáticamente o si deben completar preguntas personalizadas y esperar tu aprobación.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label class="flex items-start gap-3 p-4 rounded-2xl border border-zinc-200 bg-white hover:border-emerald-500 cursor-pointer">
+                        <input type="radio" name="volunteerMode" value="immediate" checked={org.volunteerMode !== 'approval_required'} class="mt-1 rounded-full text-emerald-600 focus:ring-emerald-500" />
+                        <div>
+                          <span class="block text-sm font-bold text-zinc-900">Aceptación Inmediata 🌱</span>
+                          <span class="block text-xs text-zinc-500">Los usuarios quedan inscriptos automáticamente como voluntarios al solicitarlo.</span>
+                        </div>
+                      </label>
+
+                      <label class="flex items-start gap-3 p-4 rounded-2xl border border-zinc-200 bg-white hover:border-violet-500 cursor-pointer">
+                        <input type="radio" name="volunteerMode" value="approval_required" checked={org.volunteerMode === 'approval_required'} class="mt-1 rounded-full text-violet-600 focus:ring-violet-500" />
+                        <div>
+                          <span class="block text-sm font-bold text-zinc-900">Revisión Requerida ⏳</span>
+                          <span class="block text-xs text-zinc-500">Los postulantes deben responder tu formulario y esperar tu aprobación desde este panel.</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <!-- Custom Form Builder -->
+                    <div class="space-y-3 pt-3">
+                      <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Preguntas del Formulario Personalizado</label>
+                        <button type="button" id="add-form-question-btn" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                          + Añadir Pregunta
+                        </button>
+                      </div>
+
+                      <input type="hidden" name="volunteerFormSchema" id="volunteer-form-schema-input" value={org.volunteerFormSchema || ''} />
+
+                      <div id="questions-builder-list" class="space-y-3">
+                        <!-- Dynamic questions rendered via JS -->
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
@@ -648,6 +744,30 @@ import * as schema from '../../../lib/db/schema';
       </>
     )}
 
+    <!-- Modal: Inspect Volunteer Answers -->
+    <div id="inspect-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden backdrop-blur-sm">
+      <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+          <div>
+            <h3 class="text-lg font-bold text-zinc-950" id="inspect-modal-title">Respuestas del Formulario</h3>
+            <p class="text-xs text-zinc-500" id="inspect-modal-subtitle">Postulación de Voluntariado</p>
+          </div>
+          <button type="button" id="close-inspect-modal-btn" class="text-zinc-400 hover:text-zinc-600 font-bold text-xl p-1">
+            &times;
+          </button>
+        </div>
+
+        <div id="inspect-modal-content" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <!-- Dynamic answers content -->
+        </div>
+
+        <div class="pt-2 border-t border-zinc-100 flex justify-end">
+          <button type="button" id="close-inspect-modal-btn-2" class="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </Layout>
 
@@ -678,4 +798,158 @@ import * as schema from '../../../lib/db/schema';
       });
     });
   });
+
+  // -------------------------------------------------------------
+  // Custom Form Builder Logic
+  // -------------------------------------------------------------
+  const schemaInput = document.getElementById('volunteer-form-schema-input') as HTMLInputElement;
+  const questionsList = document.getElementById('questions-builder-list');
+  const addQuestionBtn = document.getElementById('add-form-question-btn');
+
+  let questions: any[] = [];
+  if (schemaInput && schemaInput.value) {
+    try {
+      questions = JSON.parse(schemaInput.value);
+    } catch(e) {}
+  }
+
+  function renderQuestions() {
+    if (!questionsList) return;
+    questionsList.innerHTML = '';
+
+    if (questions.length === 0) {
+      questionsList.innerHTML = `
+        <div class="text-xs text-zinc-400 bg-zinc-50 border border-dashed border-zinc-200 rounded-xl p-4 text-center">
+          Sin preguntas personalizadas. Presioná "+ Añadir Pregunta" para agregar consultas (ej: Disponibilidad, Teléfono, Motivación).
+        </div>
+      `;
+    } else {
+      questions.forEach((q, idx) => {
+        const card = document.createElement('div');
+        card.className = 'flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl';
+        card.innerHTML = `
+          <div class="flex-1 space-y-2">
+            <input type="text" data-q-label="${idx}" value="${q.label || ''}" placeholder="Escribí tu pregunta..." class="w-full rounded-xl border border-zinc-200 bg-white p-2 text-xs font-semibold focus:outline-none focus:border-emerald-600" />
+            <div class="flex items-center gap-3">
+              <select data-q-type="${idx}" class="rounded-lg border border-zinc-200 bg-white p-1 text-[11px] font-semibold text-zinc-700">
+                <option value="text" ${q.type === 'text' ? 'selected' : ''}>Texto Corto</option>
+                <option value="textarea" ${q.type === 'textarea' ? 'selected' : ''}>Texto Largo</option>
+                <option value="checkbox" ${q.type === 'checkbox' ? 'selected' : ''}>Casilla de Verificación</option>
+              </select>
+              <label class="flex items-center gap-1 text-[11px] font-semibold text-zinc-500 cursor-pointer">
+                <input type="checkbox" data-q-req="${idx}" ${q.required ? 'checked' : ''} class="rounded text-emerald-600" />
+                <span>Obligatoria</span>
+              </label>
+            </div>
+          </div>
+          <button type="button" data-q-del="${idx}" class="text-xs font-bold text-rose-500 hover:text-rose-700 p-1">
+            ✕
+          </button>
+        `;
+        questionsList.appendChild(card);
+      });
+    }
+
+    if (schemaInput) {
+      schemaInput.value = JSON.stringify(questions);
+    }
+  }
+
+  renderQuestions();
+
+  if (addQuestionBtn) {
+    addQuestionBtn.addEventListener('click', () => {
+      questions.push({
+        id: `q_${Date.now()}`,
+        label: '',
+        type: 'text',
+        required: false,
+      });
+      renderQuestions();
+    });
+  }
+
+  if (questionsList) {
+    questionsList.addEventListener('input', (e: any) => {
+      const target = e.target;
+      if (target.dataset.qLabel !== undefined) {
+        const idx = parseInt(target.dataset.qLabel, 10);
+        questions[idx].label = target.value;
+        if (schemaInput) schemaInput.value = JSON.stringify(questions);
+      }
+    });
+
+    questionsList.addEventListener('change', (e: any) => {
+      const target = e.target;
+      if (target.dataset.qType !== undefined) {
+        const idx = parseInt(target.dataset.qType, 10);
+        questions[idx].type = target.value;
+        if (schemaInput) schemaInput.value = JSON.stringify(questions);
+      } else if (target.dataset.qReq !== undefined) {
+        const idx = parseInt(target.dataset.qReq, 10);
+        questions[idx].required = target.checked;
+        if (schemaInput) schemaInput.value = JSON.stringify(questions);
+      }
+    });
+
+    questionsList.addEventListener('click', (e: any) => {
+      const btn = e.target.closest('[data-q-del]');
+      if (btn) {
+        const idx = parseInt(btn.dataset.qDel, 10);
+        questions.splice(idx, 1);
+        renderQuestions();
+      }
+    });
+  }
+
+  // -------------------------------------------------------------
+  // Inspect Answers Modal Logic
+  // -------------------------------------------------------------
+  const modal = document.getElementById('inspect-modal');
+  const modalTitle = document.getElementById('inspect-modal-title');
+  const modalSub = document.getElementById('inspect-modal-subtitle');
+  const modalContent = document.getElementById('inspect-modal-content');
+  const closeModalBtns = [
+    document.getElementById('close-inspect-modal-btn'),
+    document.getElementById('close-inspect-modal-btn-2'),
+  ];
+
+  document.querySelectorAll('[data-inspect-answers]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const raw = btn.getAttribute('data-inspect-answers');
+      const vName = btn.getAttribute('data-volunteer-name') || 'Voluntario/a';
+      const actTitle = btn.getAttribute('data-activity-title') || 'Actividad';
+
+      if (modalTitle) modalTitle.textContent = `Respuestas de ${vName}`;
+      if (modalSub) modalSub.textContent = actTitle;
+
+      if (modalContent) {
+        modalContent.innerHTML = '';
+        try {
+          const answers = JSON.parse(raw || '{}');
+          const keys = Object.keys(answers);
+          if (keys.length === 0) {
+            modalContent.innerHTML = '<p class="text-xs text-zinc-400">Sin respuestas en el formulario.</p>';
+          } else {
+            keys.forEach((key) => {
+              const val = answers[key];
+              const item = document.createElement('div');
+              item.className = 'bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-1';
+              item.innerHTML = `
+                <span class="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider">${key}</span>
+                <span class="block text-sm font-semibold text-zinc-900">${val === true ? 'Sí' : val || '-'}</span>
+              `;
+              modalContent.appendChild(item);
+            });
+          }
+        } catch {
+          modalContent.innerHTML = `<p class="text-xs text-zinc-600 whitespace-pre-wrap">${raw}</p>`;
+        }
+      }
+
+      modal?.classList.remove('hidden');
+    });
+  });
+
+  closeModalBtns.forEach((b) => b?.addEventListener('click', () => modal?.classList.add('hidden')));
 </script>

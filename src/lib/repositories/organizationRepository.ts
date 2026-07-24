@@ -98,6 +98,8 @@ export const organizationRepository = {
         verifiedAt: null,
         verifiedBy: null,
         verificationLevel: "none",
+        volunteerMode: data.volunteerMode || "immediate",
+        volunteerFormSchema: data.volunteerFormSchema || null,
         createdAt: new Date(),
         deletedAt: null,
       };
