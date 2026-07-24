@@ -145,7 +145,7 @@ if (Astro.request.method === 'POST') {
       const deleteUserAccount = formData.get('deleteUserAccount') === 'true';
       if (deleteUserAccount) {
         const { userRepository } = await import('../../../lib/repositories/userRepository');
-        await userRepository.softDelete(currentUser.id);
+        await userRepository.hardDelete(currentUser.id);
         const { auth } = await import('../../../lib/auth/auth');
         try {
           await auth.api.signOut({ headers: Astro.request.headers });

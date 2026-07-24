@@ -52,7 +52,7 @@ if (Astro.request.method === 'POST') {
       currentUser.role = 'organizer';
       return Astro.redirect('/dashboard/organizador');
     } else if (action === 'delete_account') {
-      await userRepository.softDelete(currentUser.id);
+      await userRepository.hardDelete(currentUser.id);
       const { auth } = await import('../../lib/auth/auth');
       try {
         await auth.api.signOut({ headers: Astro.request.headers });

@@ -1,6 +1,6 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../db/client";
-import { user } from "../db/schema";
+import { user, session, account, organizationMembers, inscriptions, bookmarks } from "../db/schema";
 
 export type UserSelect = typeof user.$inferSelect;
 export type UserInsert = typeof user.$inferInsert;
@@ -134,6 +134,23 @@ export const userRepository = {
         return mockUsers[index];
       }
       throw error;
+    }
+  },
+
+  async hardDelete(id: string): Promise<void> {
+    try {
+      await db.delete(session).where(eq(session.userId, id));
+      await db.delete(account).where(eq(account.userId, id));
+      await db.delete(organizationMembers).where(eq(organizationMembers.userId, id));
+      await db.delete(inscriptions).where(eq(inscriptions.userId, id));
+      await db.delete(bookmarks).where(eq(bookmarks.userId, id));
+      await db.delete(user).where(eq(user.id, id));
+    } catch (error) {
+      console.warn("DB Connection failed, simulating user hard delete.");
+      const index = mockUsers.findIndex(u => u.id === id);
+      if (index !== -1) {
+        mockUsers.splice(index, 1);
+      }
     }
   },
 };
