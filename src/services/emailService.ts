@@ -3,7 +3,7 @@ import { emailTemplate } from "./emailTemplates";
 export interface EmailPayload {
   to: string;
   subject: string;
-  type: 'account_created' | 'organization_approved' | 'activity_registration' | 'activity_volunteer' | 'activity_reminder' | 'activity_cancelled' | 'activity_updated';
+  type: 'account_created' | 'organization_approved' | 'activity_registration' | 'activity_volunteer' | 'new_volunteer_alert' | 'activity_reminder' | 'activity_cancelled' | 'activity_updated';
   html: string;
 }
 
@@ -96,6 +96,16 @@ export const emailService = {
       to: userEmail,
       subject: `¡Gracias por ofrecerte como voluntario/a en: ${activity.title}! 🌱`,
       type: "activity_volunteer",
+      html,
+    });
+  },
+
+  async sendNewVolunteerAlert(orgEmail: string, orgName: string, info: { volunteerName: string; volunteerEmail: string; activityTitle: string; activityId: string; activitySlug: string }) {
+    const html = emailTemplate.newVolunteerAlert({ orgName, info });
+    await this.sendEmail({
+      to: orgEmail,
+      subject: `🌱 Nuevo voluntario/a en tu actividad: ${info.activityTitle}`,
+      type: "new_volunteer_alert",
       html,
     });
   },

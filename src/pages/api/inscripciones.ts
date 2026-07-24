@@ -52,7 +52,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Register as volunteer (uses a different status)
       await activityRepository.registerParticipant(activityId, user.id, 'volunteer');
 
-      // Send volunteer confirmation email asynchronously
+      // Send volunteer confirmation email to the participant
       if (user.email) {
         emailService.sendVolunteerRegistration(user.email, user.name || 'Participante', {
           title: activity.title,
@@ -61,6 +61,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
           address: activity.location?.address,
           id: activity.id,
           slug: activity.slug,
+        });
+      }
+
+      // Notify the organizer by email
+      const orgEmail = activity.contactEmail || activity.organization?.email;
+      if (orgEmail) {
+        emailService.sendNewVolunteerAlert(orgEmail, activity.organization?.name || 'Organización', {
+          volunteerName: user.name || 'Un usuario',
+          volunteerEmail: user.email || '',
+          activityTitle: activity.title,
+          activityId: activity.id,
+          activitySlug: activity.slug,
         });
       }
 

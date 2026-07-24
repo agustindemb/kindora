@@ -171,4 +171,22 @@ export const emailTemplate = {
       </div>
     `);
   },
+
+  newVolunteerAlert({ orgName, info }: { orgName: string; info: { volunteerName: string; volunteerEmail: string; activityTitle: string; activityId: string; activitySlug: string } }) {
+    return baseLayout(`
+      <h2 style="font-size: 22px; font-weight: 800; margin-top: 0; color: #09090b;">🌱 Nuevo/a voluntario/a se postuló</h2>
+      <p>Hola equipo de <strong>${orgName}</strong>, un/a participante se ha ofrecido como voluntario/a en una de tus actividades:</p>
+
+      <div class="card">
+        <h3 style="margin: 0 0 12px 0; color: #09090b; font-size: 15px;">📋 ${info.activityTitle}</h3>
+        <p style="margin: 4px 0; font-size: 14px; color: #52525b;"><strong>Nombre:</strong> ${info.volunteerName}</p>
+        <p style="margin: 4px 0; font-size: 14px; color: #52525b;"><strong>Correo:</strong> <a href="mailto:${info.volunteerEmail}" style="color: #10b981;">${info.volunteerEmail}</a></p>
+      </div>
+
+      <p>Podés contactarle directamente o gestionar los voluntarios desde tu panel de organización.</p>
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="https://kindora.com.ar/dashboard/organizador" class="btn">Ir al Panel de Organización</a>
+      </div>
+    `);
+  },
 };

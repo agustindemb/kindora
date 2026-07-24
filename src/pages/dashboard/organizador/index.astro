@@ -433,20 +433,20 @@ import * as schema from '../../../lib/db/schema';
 
             <!-- Tab Content: Participantes (Attendee Management) -->
             <section id="tab-content-participantes" class="space-y-6 hidden">
-              <h2 class="text-xl font-bold text-zinc-950">Inscripciones y asistentes</h2>
-              
+              <h2 class="text-xl font-bold text-zinc-950">Inscripciones y voluntarios</h2>
+
               {pendingInscriptionsList.length === 0 ? (
-                <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay inscriptos registrados en tus actividades por el momento.</p>
+                <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No hay inscriptos ni voluntarios en tus actividades por el momento.</p>
               ) : (
                 <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
                   <div class="overflow-x-auto">
                     <table class="w-full border-collapse text-left text-sm text-zinc-500">
                       <thead class="bg-zinc-50 text-xs font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-200">
                         <tr>
-                          <th class="px-6 py-4">Participante</th>
+                          <th class="px-6 py-4">Persona</th>
                           <th class="px-6 py-4">Actividad</th>
                           <th class="px-6 py-4">Fecha Registro</th>
-                          <th class="px-6 py-4">Estado</th>
+                          <th class="px-6 py-4">Rol</th>
                           <th class="px-6 py-4">Acción</th>
                         </tr>
                       </thead>
@@ -464,12 +464,16 @@ import * as schema from '../../../lib/db/schema';
                               {new Date(ins.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                             </td>
                             <td class="px-6 py-4 text-xs">
-                              <span class={`inline-flex rounded px-1.5 py-0.5 font-bold ${
+                              <span class={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-bold ${
                                 ins.status === 'registered' ? 'bg-emerald-50 text-emerald-700' :
+                                ins.status === 'volunteer' ? 'bg-violet-50 text-violet-700' :
                                 ins.status === 'attended' ? 'bg-blue-50 text-blue-700' :
-                                'bg-rose-50 text-rose-700'
+                                'bg-zinc-100 text-zinc-500'
                               }`}>
-                                {ins.status === 'registered' ? 'Anotado' : ins.status === 'attended' ? 'Asistió' : 'Cancelado'}
+                                {ins.status === 'registered' ? '✅ Participante' :
+                                 ins.status === 'volunteer' ? '🌱 Voluntario/a' :
+                                 ins.status === 'attended' ? '🎯 Asistió' :
+                                 'Cancelado'}
                               </span>
                             </td>
                             <td class="px-6 py-4">
@@ -482,6 +486,11 @@ import * as schema from '../../../lib/db/schema';
                                     Registrar Asistencia
                                   </button>
                                 </form>
+                              )}
+                              {ins.status === 'volunteer' && ins.user?.email && (
+                                <a href={`mailto:${ins.user.email}?subject=Gracias por ser voluntario/a en ${ins.activityTitle}`} class="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline">
+                                  Contactar
+                                </a>
                               )}
                             </td>
                           </tr>
