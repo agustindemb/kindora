@@ -13,19 +13,37 @@ if (!currentUser) {
   return Astro.redirect('/login');
 }
 
-// Fetch participant data
-const inscriptionsList = await activityRepository.getUserInscriptions(currentUser.id);
-const bookmarkedActivities = await activityRepository.getBookmarkedActivities(currentUser.id);
-const notificationsList = await notificationService.getUserNotifications(currentUser.id);
+// Fetch participant data safely
+let inscriptionsList: any[] = [];
+let bookmarkedActivities: any[] = [];
+let notificationsList: any[] = [];
+
+try {
+  inscriptionsList = (await activityRepository.getUserInscriptions(currentUser.id)).filter(ins => ins && ins.activity);
+} catch(e) {
+  console.warn("[Participante] Error fetching user inscriptions:", e);
+}
+
+try {
+  bookmarkedActivities = await activityRepository.getBookmarkedActivities(currentUser.id);
+} catch(e) {
+  console.warn("[Participante] Error fetching bookmarked activities:", e);
+}
+
+try {
+  notificationsList = await notificationService.getUserNotifications(currentUser.id);
+} catch(e) {
+  console.warn("[Participante] Error fetching user notifications:", e);
+}
 
 // Split registered activities
 const now = new Date();
-const upcomingInscriptions = inscriptionsList.filter((ins) => new Date(ins.activity.startsAt) > now && ins.status === 'registered');
-const pastInscriptions = inscriptionsList.filter((ins) => new Date(ins.activity.startsAt) <= now || ins.status === 'attended');
+const upcomingInscriptions = inscriptionsList.filter((ins) => ins?.activity?.startsAt && new Date(ins.activity.startsAt) > now && ins.status === 'registered');
+const pastInscriptions = inscriptionsList.filter((ins) => ins?.activity?.startsAt && (new Date(ins.activity.startsAt) <= now || ins.status === 'attended'));
 
 // Volunteer Impact Profile Metrics
-const totalHours = inscriptionsList.length * 2; // Average 2 hours per activity
-const causesSupported = Array.from(new Set(inscriptionsList.map(ins => ins.activity.category?.name).filter(Boolean)));
+const totalHours = inscriptionsList.length * 2;
+const causesSupported = Array.from(new Set(inscriptionsList.map(ins => ins?.activity?.category?.name).filter(Boolean)));
 
 // Handle Profile Updates POST
 let successMsg = '';
