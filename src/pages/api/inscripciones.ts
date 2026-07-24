@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     if (action === 'cancel') {
-      await activityRepository.cancelInscription(user.id, activityId);
+      await activityRepository.unregisterParticipant(activityId, user.id);
 
       // Trigger cancel email asynchronously
       if (user.email) {
@@ -60,7 +60,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         );
       }
 
-      await activityRepository.registerUser(user.id, activityId, activity.registrationType || 'open');
+      await activityRepository.registerParticipant(activityId, user.id, 'registered');
 
       // Trigger registration confirmation email asynchronously
       if (user.email) {
