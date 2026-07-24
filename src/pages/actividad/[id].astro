@@ -546,13 +546,15 @@ const jsonLd = {
                     >
                       {isSoldOut ? 'Cupos completos' : 'Registrarme ahora'}
                     </button>
-                    <button 
-                      type="button"
-                      id="volunteer-btn"
-                      class="w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold border-2 border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                    >
-                      🌱 Quiero ser voluntario/a
-                    </button>
+                    {activity.needsVolunteers !== false && (
+                      <button 
+                        type="button"
+                        id="volunteer-btn"
+                        class="w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold border-2 border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        🌱 Quiero ser voluntario/a
+                      </button>
+                    )}
                   </div>
                 )}
               </>

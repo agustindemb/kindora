@@ -170,6 +170,7 @@ export const activities = pgTable("activities", {
   registrationType: text("registrationType").default("open").notNull(), // open, approval_required, external
   externalUrl: text("externalUrl"),
   visibility: text("visibility").default("public").notNull(), // public, unlisted, private
+  needsVolunteers: boolean("needsVolunteers").default(true).notNull(), // true = accepts volunteers, false = does not need volunteers
   contactName: text("contactName"),
   contactEmail: text("contactEmail"),
   contactPhone: text("contactPhone"),

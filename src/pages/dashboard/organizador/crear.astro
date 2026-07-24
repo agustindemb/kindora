@@ -63,6 +63,7 @@ if (Astro.request.method === 'POST') {
     const registrationType = formData.get('registrationType') as string;
     const externalUrl = formData.get('externalUrl') as string || null;
     const visibility = formData.get('visibility') as string;
+    const needsVolunteers = formData.get('needsVolunteers') === 'on' || formData.get('needsVolunteers') === 'true';
     
     const contactName = formData.get('contactName') as string || null;
     const contactEmail = formData.get('contactEmail') as string || null;
@@ -104,6 +105,7 @@ if (Astro.request.method === 'POST') {
           registrationType,
           externalUrl,
           visibility,
+          needsVolunteers,
           contactName,
           contactEmail,
           contactPhone,
@@ -138,6 +140,7 @@ if (Astro.request.method === 'POST') {
           registrationType,
           externalUrl,
           visibility,
+          needsVolunteers,
           contactName,
           contactEmail,
           contactPhone,
@@ -486,6 +489,22 @@ if (Astro.request.method === 'POST') {
               <option value="approval_required" selected={activityToEdit?.registrationType === 'approval_required'}>Requiere aprobación (Revisión manual)</option>
               <option value="external" selected={activityToEdit?.registrationType === 'external'}>Sitio Externo (Redirección)</option>
             </select>
+          </div>
+
+          <!-- Needs Volunteers Toggle -->
+          <div class="sm:col-span-2 pt-2">
+            <label class="flex items-start gap-3 p-4 rounded-2xl border border-zinc-200 bg-zinc-50/60 hover:bg-zinc-50 cursor-pointer">
+              <input 
+                type="checkbox" 
+                name="needsVolunteers" 
+                checked={activityToEdit ? activityToEdit.needsVolunteers !== false : true} 
+                class="mt-1 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5" 
+              />
+              <div>
+                <span class="block text-sm font-bold text-zinc-900">¿Esta actividad requiere o acepta voluntarios/as? 🌱</span>
+                <span class="block text-xs text-zinc-500">Si está marcado, los usuarios verán la opción para postularse como voluntarios. Si lo desmarcás, solo podrán inscribirse como asistentes/participantes.</span>
+              </div>
+            </label>
           </div>
 
           <div>

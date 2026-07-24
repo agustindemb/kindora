@@ -312,6 +312,7 @@ export const activityRepository = {
         registrationType: activityData.registrationType || "open",
         externalUrl: activityData.externalUrl || null,
         visibility: activityData.visibility || "public",
+        needsVolunteers: activityData.needsVolunteers ?? true,
         contactName: activityData.contactName || null,
         contactEmail: activityData.contactEmail || null,
         contactPhone: activityData.contactPhone || null,
