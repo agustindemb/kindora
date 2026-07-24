@@ -48,6 +48,30 @@ export const POST: APIRoute = async ({ request, locals }) => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
+    } else if (action === 'volunteer') {
+      // Register as volunteer (uses a different status)
+      await activityRepository.registerParticipant(activityId, user.id, 'volunteer');
+
+      // Send volunteer confirmation email asynchronously
+      if (user.email) {
+        emailService.sendVolunteerRegistration(user.email, user.name || 'Participante', {
+          title: activity.title,
+          startsAt: activity.startsAt,
+          city: activity.location?.city || 'Buenos Aires',
+          address: activity.location?.address,
+          id: activity.id,
+          slug: activity.slug,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          isVolunteering: true, 
+          message: '¡Gracias por ofrecerte como voluntario/a! El equipo organizador te contactará pronto.' 
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
     } else {
       // Check capacity
       const capacityNum = Number(activity.capacity) || 0;

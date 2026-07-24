@@ -145,4 +145,30 @@ export const emailTemplate = {
       </div>
     `);
   },
+
+  activityVolunteer({ userName, activity }: { userName: string; activity: { title: string; startsAt: Date | string; city: string; address?: string; id: string; slug: string } }) {
+    const formattedDate = new Date(activity.startsAt).toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return baseLayout(`
+      <h2 style="font-size: 22px; font-weight: 800; margin-top: 0; color: #09090b;">¡Gracias por tu voluntad de ayudar! 🌱</h2>
+      <p>Hola <strong>${userName}</strong>, tu solicitud como <strong>voluntario/a</strong> para la siguiente actividad ha sido registrada:</p>
+
+      <div class="card">
+        <h3 style="margin: 0 0 8px 0; color: #09090b; font-size: 16px;">${activity.title}</h3>
+        <p style="margin: 4px 0; font-size: 14px; color: #52525b;">🗓️ <strong>Fecha:</strong> ${formattedDate} hs</p>
+        <p style="margin: 4px 0; font-size: 14px; color: #52525b;">📍 <strong>Lugar:</strong> ${activity.address ? `${activity.address}, ${activity.city}` : activity.city}</p>
+      </div>
+
+      <p>El equipo organizador revisará tu solicitud y se pondrá en contacto con vos antes de la actividad para coordinar los detalles de tu colaboración.</p>
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="https://kindora.com.ar/actividad/${activity.id}-${activity.slug}" class="btn">Ver Detalles de la Actividad</a>
+      </div>
+    `);
+  },
 };
