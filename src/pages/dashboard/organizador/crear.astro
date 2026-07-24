@@ -72,8 +72,8 @@ if (Astro.request.method === 'POST') {
     const address = formData.get('address') as string;
     const city = formData.get('city') as string;
     const province = formData.get('province') as string;
-    const latitude = parseFloat(formData.get('latitude') as string || '-34.6037');
-    const longitude = parseFloat(formData.get('longitude') as string || '-58.3816');
+    const latitude = parseFloat(formData.get('latitude') as string) || -34.6037;
+    const longitude = parseFloat(formData.get('longitude') as string) || -58.3816;
 
     // Accessibility features selected
     const selectedA11y = formData.getAll('accessibility') as string[];
@@ -383,31 +383,47 @@ if (Astro.request.method === 'POST') {
       <div id="step-section-3" class="space-y-5 hidden">
         <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Ubicación del Encuentro</h3>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Dirección (Calle y altura)</label>
-            <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Dirección (Calle y altura)</label>
+              <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
+
+            <div>
+              <label for="act-city" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ciudad / Barrio</label>
+              <input type="text" id="act-city" name="city" value={activityToEdit?.location?.city || ''} placeholder="ej: Tigre o Palermo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
+
+            <div>
+              <label for="act-prov" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Provincia</label>
+              <input type="text" id="act-prov" name="province" value={activityToEdit?.location?.province || ''} placeholder="ej: Buenos Aires" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+            </div>
           </div>
 
-          <div>
-            <label for="act-city" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ciudad / Barrio</label>
-            <input type="text" id="act-city" name="city" value={activityToEdit?.location?.city || ''} placeholder="ej: Tigre o Palermo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          <!-- Geocoding Status Helper -->
+          <div class="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl">
+            <span class="text-base">📍</span>
+            <span>Las coordenadas del mapa se ubican automáticamente al ingresar la dirección.</span>
           </div>
 
-          <div>
-            <label for="act-prov" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Provincia</label>
-            <input type="text" id="act-prov" name="province" value={activityToEdit?.location?.province || ''} placeholder="ej: Buenos Aires" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
-          </div>
+          <!-- Advanced: Collapsible Manual Coordinates -->
+          <div class="pt-2">
+            <button type="button" id="toggle-coords-btn" class="text-xs text-zinc-400 hover:text-emerald-600 font-semibold transition-colors flex items-center gap-1">
+              <span id="toggle-coords-icon">▶</span> Ajustar coordenadas manualmente en el mapa (Opcional / Avanzado)
+            </button>
 
-          <!-- Mock coordinates for Leaflet map mapping -->
-          <div>
-            <label for="act-lat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Latitud (Coordenadas)</label>
-            <input type="number" step="any" id="act-lat" name="latitude" value={activityToEdit?.location?.latitude || -34.6037} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
-          </div>
+            <div id="coords-container" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-200">
+              <div>
+                <label for="act-lat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Latitud</label>
+                <input type="number" step="any" id="act-lat" name="latitude" value={activityToEdit?.location?.latitude || -34.6037} placeholder="-34.6037" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+              </div>
 
-          <div>
-            <label for="act-lng" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Longitud (Coordenadas)</label>
-            <input type="number" step="any" id="act-lng" name="longitude" value={activityToEdit?.location?.longitude || -58.3816} class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+              <div>
+                <label for="act-lng" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Longitud</label>
+                <input type="number" step="any" id="act-lng" name="longitude" value={activityToEdit?.location?.longitude || -58.3816} placeholder="-58.3816" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -757,6 +773,52 @@ if (Astro.request.method === 'POST') {
     btnPrev.addEventListener('click', () => {
       if (currentStep > 1) {
         updateStep(currentStep - 1);
+      }
+    });
+  }
+
+  // Automatic geocoding on address inputs change/blur
+  const actAddress = document.getElementById('act-address') as HTMLInputElement;
+  const actCity = document.getElementById('act-city') as HTMLInputElement;
+  const actProv = document.getElementById('act-prov') as HTMLInputElement;
+
+  async function triggerAutoGeocode() {
+    const address = actAddress?.value?.trim();
+    const city = actCity?.value?.trim();
+    const prov = actProv?.value?.trim();
+
+    if (!address && !city) return;
+
+    const query = [address, city, prov, 'Argentina'].filter(Boolean).join(', ');
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data && data[0]) {
+        const latInput = document.getElementById('act-lat') as HTMLInputElement;
+        const lngInput = document.getElementById('act-lng') as HTMLInputElement;
+        if (latInput) latInput.value = data[0].lat;
+        if (lngInput) lngInput.value = data[0].lon;
+      }
+    } catch (e) {}
+  }
+
+  [actAddress, actCity, actProv].forEach((input) => {
+    input?.addEventListener('change', triggerAutoGeocode);
+    input?.addEventListener('blur', triggerAutoGeocode);
+  });
+
+  // Toggle Manual Coordinates
+  const toggleCoordsBtn = document.getElementById('toggle-coords-btn');
+  const coordsContainer = document.getElementById('coords-container');
+  if (toggleCoordsBtn && coordsContainer) {
+    toggleCoordsBtn.addEventListener('click', () => {
+      const isHidden = coordsContainer.classList.contains('hidden');
+      if (isHidden) {
+        coordsContainer.classList.remove('hidden');
+        document.getElementById('toggle-coords-icon')!.textContent = '▼';
+      } else {
+        coordsContainer.classList.add('hidden');
+        document.getElementById('toggle-coords-icon')!.textContent = '▶';
       }
     });
   }
