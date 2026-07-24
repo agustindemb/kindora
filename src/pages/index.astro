@@ -395,6 +395,105 @@ const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
       </div>
     </div>
   </section>
+
+  <!-- Support & Contact Section -->
+  <section id="soporte" class="py-16 sm:py-24 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 text-white relative overflow-hidden border-t border-zinc-800/80">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px] opacity-15"></div>
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <!-- Text Left -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">
+            <span>💬 Soporte y Consultas</span>
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
+            ¿Tenés alguna duda o querés sumar tu organización?
+          </h2>
+          <p class="text-zinc-400 text-sm sm:text-base leading-relaxed">
+            Escribinos directamente. Nuestro equipo de soporte e inclusión responderá tu mensaje a la brevedad para ayudarte en todo el proceso.
+          </p>
+          
+          <div class="space-y-4 pt-4 border-t border-zinc-800 text-xs sm:text-sm text-zinc-300">
+            <div class="flex items-center gap-3">
+              <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 font-bold">📧</span>
+              <span><strong>Email directo:</strong> hola@kindora.proasc.com</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 font-bold">⚡</span>
+              <span><strong>Respuesta promedio:</strong> Menos de 24 horas</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Support Form Right -->
+        <div class="lg:col-span-7 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+          <form id="support-form" class="space-y-4">
+            <div id="support-alert" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="sup-name" class="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">Nombre completo</label>
+                <input 
+                  type="text" 
+                  id="sup-name" 
+                  name="name" 
+                  placeholder="ej: María Pérez" 
+                  class="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500 font-medium" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label for="sup-email" class="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">Correo electrónico</label>
+                <input 
+                  type="email" 
+                  id="sup-email" 
+                  name="email" 
+                  placeholder="vos@ejemplo.com" 
+                  class="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500 font-medium" 
+                  required 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label for="sup-type" class="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">Tipo de consulta</label>
+              <select 
+                id="sup-type" 
+                name="type" 
+                class="w-full rounded-xl border border-white/10 bg-zinc-900 p-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium"
+              >
+                <option value="Consulta general">Consulta general</option>
+                <option value="Soporte de organización">Registro de organización / Verificación</option>
+                <option value="Soporte técnico / Accesibilidad">Soporte técnico / Accesibilidad</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="sup-message" class="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">Mensaje</label>
+              <textarea 
+                id="sup-message" 
+                name="message" 
+                rows="4" 
+                placeholder="Escribí aquí tus dudas o sugerencias..." 
+                class="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500 font-medium" 
+                required
+              ></textarea>
+            </div>
+
+            <button 
+              type="submit" 
+              id="sup-submit-btn"
+              class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/40 transition-all cursor-pointer"
+            >
+              <span>Enviar mensaje</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
 </Layout>
 
 <script>
@@ -474,5 +573,48 @@ const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
   window.addEventListener('click', () => {
     toggleMenu(cityMenu, cityArrow, false);
     toggleMenu(dateMenu, dateArrow, false);
+  });
+
+  // Support Form submission to n8n webhook
+  const supportForm = document.getElementById('support-form') as HTMLFormElement;
+  const supportAlert = document.getElementById('support-alert');
+  const supportBtn = document.getElementById('sup-submit-btn');
+
+  supportForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!supportBtn || !supportAlert) return;
+
+    const originalBtnText = supportBtn.innerHTML;
+    supportBtn.innerHTML = 'Enviando...';
+    supportBtn.setAttribute('disabled', 'true');
+
+    const formData = new FormData(supportForm);
+    const payload = {
+      name: formData.get('name'),
+      email: formData.get('email'),
+      type: formData.get('type'),
+      message: formData.get('message'),
+      submittedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('https://n8n.proasc.com/webhook/a925cd3b-5d3f-485c-a51a-4922475d5e7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      supportAlert.classList.remove('hidden', 'bg-rose-500/20', 'text-rose-200');
+      supportAlert.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border', 'border-emerald-500/30');
+      supportAlert.innerHTML = '¡Gracias por contactarnos! Tu consulta ha sido enviada con éxito. Te responderemos a la brevedad.';
+      supportForm.reset();
+    } catch (err) {
+      supportAlert.classList.remove('hidden', 'bg-emerald-500/20', 'text-emerald-300');
+      supportAlert.classList.add('bg-rose-500/20', 'text-rose-200', 'border', 'border-rose-500/30');
+      supportAlert.innerHTML = 'Hubo un inconveniente al enviar tu consulta. Podés reintentar o escribirnos a hola@kindora.proasc.com.';
+    } finally {
+      supportBtn.innerHTML = originalBtnText;
+      supportBtn.removeAttribute('disabled');
+    }
   });
 </script>
