@@ -43,7 +43,7 @@ export const emailTemplate = {
       <p>Te damos una cálida bienvenida a <strong>Kindora</strong>, la plataforma que conecta personas con talleres, voluntariados y experiencias inclusivas en toda la comunidad.</p>
       <p>A partir de ahora podés explorar actividades cerca tuyo, anotarte en un click y guardar tus favoritas.</p>
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/explorar" class="btn">Explorar Actividades</a>
+        <a href="https://kindora.com.ar/explorar" class="btn">Explorar Actividades</a>
       </div>
     `);
   },
@@ -54,7 +54,7 @@ export const emailTemplate = {
       <p>Queremos informarte que la solicitud de verificación para tu organización ha sido <strong>aprobada por el equipo administrador de Kindora</strong>.</p>
       <p>Tu organización ahora cuenta con el sello oficial de verificación visible para toda la comunidad y podés comenzar a publicar voluntariados y talleres.</p>
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/dashboard/organizador" class="btn">Ir a mi Panel de Organización</a>
+        <a href="https://kindora.com.ar/dashboard/organizador" class="btn">Ir a mi Panel de Organización</a>
       </div>
     `);
   },
@@ -80,7 +80,7 @@ export const emailTemplate = {
 
       <p>Recibirás un recordatorio antes del inicio de la actividad.</p>
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/actividad/${activity.id}-${activity.slug}" class="btn">Ver Detalles de la Actividad</a>
+        <a href="https://kindora.com.ar/actividad/${activity.id}-${activity.slug}" class="btn">Ver Detalles de la Actividad</a>
       </div>
     `);
   },
@@ -105,7 +105,7 @@ export const emailTemplate = {
       </div>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/dashboard/participante" class="btn">Ver en Mi Cuenta</a>
+        <a href="https://kindora.com.ar/dashboard/participante" class="btn">Ver en Mi Cuenta</a>
       </div>
     `);
   },
@@ -117,7 +117,7 @@ export const emailTemplate = {
       ${reason ? `<div class="card"><p style="margin: 0; color: #7f1d1d; font-size: 14px;"><strong>Motivo:</strong> ${reason}</p></div>` : ''}
       <p>Te invitamos a explorar otras actividades disponibles en tu zona.</p>
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/explorar" class="btn">Descubrir Otras Actividades</a>
+        <a href="https://kindora.com.ar/explorar" class="btn">Descubrir Otras Actividades</a>
       </div>
     `);
   },
@@ -141,7 +141,7 @@ export const emailTemplate = {
       </div>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="https://kindora.proasc.com/actividad/${activity.id}-${activity.slug}" class="btn">Ver Información Actualizada</a>
+        <a href="https://kindora.com.ar/actividad/${activity.id}-${activity.slug}" class="btn">Ver Información Actualizada</a>
       </div>
     `);
   },

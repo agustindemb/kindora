@@ -7,7 +7,7 @@ Disallow: /admin
 Disallow: /dashboard/
 Disallow: /api/
 
-Sitemap: https://kindora.proasc.com/sitemap.xml
+Sitemap: https://kindora.com.ar/sitemap.xml
 `;
 
   return new Response(robotsTxt, {

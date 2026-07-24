@@ -4,7 +4,7 @@ import { activities, organizations, categories } from "../lib/db/schema";
 import { isNull, eq, and } from "drizzle-orm";
 
 export const GET: APIRoute = async ({ request }) => {
-  const baseUrl = "https://kindora.proasc.com";
+  const baseUrl = "https://kindora.com.ar";
 
   const staticPages = [
     "",
