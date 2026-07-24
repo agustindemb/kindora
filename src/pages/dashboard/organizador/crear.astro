@@ -39,6 +39,10 @@ if (editId) {
   }
 }
 
+const currentCoverImage = activityToEdit?.images?.find((img: any) => img.isCover)?.url 
+  || activityToEdit?.images?.[0]?.url 
+  || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800';
+
 let errorMsg = '';
 if (Astro.request.method === 'POST') {
   try {
@@ -75,6 +79,8 @@ if (Astro.request.method === 'POST') {
     const selectedA11y = formData.getAll('accessibility') as string[];
     // Tags selected
     const selectedTags = formData.getAll('tags') as string[];
+    // Cover Image URL
+    const coverImageUrl = (formData.get('coverImageUrl') as string || '').trim() || 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800';
 
     const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -112,7 +118,8 @@ if (Astro.request.method === 'POST') {
           longitude,
         },
         selectedTags,
-        selectedA11y
+        selectedA11y,
+        [{ url: coverImageUrl, order: 1, isCover: true }]
       );
     } else {
       // Create new
@@ -146,8 +153,7 @@ if (Astro.request.method === 'POST') {
         },
         selectedTags,
         selectedA11y,
-        // Mock default cover image
-        [{ url: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800', order: 1, isCover: true }]
+        [{ url: coverImageUrl, order: 1, isCover: true }]
       );
 
       // Send email update notification to registered participants
@@ -197,11 +203,11 @@ if (Astro.request.method === 'POST') {
 
     <!-- Wizard Steps Indicator -->
     <div class="grid grid-cols-5 gap-2 mb-8 text-center text-xs font-bold text-zinc-400">
-      <div id="step-ind-1" class="border-b-4 border-emerald-600 pb-2 text-emerald-700">1. Info Básica</div>
-      <div id="step-ind-2" class="border-b-4 border-zinc-200 pb-2">2. Horarios</div>
-      <div id="step-ind-3" class="border-b-4 border-zinc-200 pb-2">3. Ubicación</div>
-      <div id="step-ind-4" class="border-b-4 border-zinc-200 pb-2">4. A11y & Contacto</div>
-      <div id="step-ind-5" class="border-b-4 border-zinc-200 pb-2">5. Registro</div>
+      <button type="button" data-step-nav="1" id="step-ind-1" class="border-b-4 border-emerald-600 pb-2 text-emerald-700 cursor-pointer hover:text-emerald-800 transition-all text-center">1. Info Básica</button>
+      <button type="button" data-step-nav="2" id="step-ind-2" class="border-b-4 border-zinc-200 pb-2 cursor-pointer hover:text-emerald-700 transition-all text-center">2. Horarios</button>
+      <button type="button" data-step-nav="3" id="step-ind-3" class="border-b-4 border-zinc-200 pb-2 cursor-pointer hover:text-emerald-700 transition-all text-center">3. Ubicación</button>
+      <button type="button" data-step-nav="4" id="step-ind-4" class="border-b-4 border-zinc-200 pb-2 cursor-pointer hover:text-emerald-700 transition-all text-center">4. A11y & Contacto</button>
+      <button type="button" data-step-nav="5" id="step-ind-5" class="border-b-4 border-zinc-200 pb-2 cursor-pointer hover:text-emerald-700 transition-all text-center">5. Registro</button>
     </div>
 
     <form method="POST" class="bg-white border border-zinc-200/80 rounded-3xl p-6 sm:p-8 shadow-xl shadow-zinc-100/50 space-y-6" id="wizard-form">
@@ -233,6 +239,50 @@ if (Astro.request.method === 'POST') {
         <div>
           <label for="act-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descripción detallada</label>
           <textarea id="act-desc" name="description" rows="5" placeholder="Describí en detalle en qué consiste la actividad, qué harán, qué deben llevar, etc." class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>{activityToEdit?.description || ''}</textarea>
+        </div>
+
+        <!-- Custom Cover Image Selection -->
+        <div class="pt-4 border-t border-zinc-100 space-y-3">
+          <label for="act-cover-url" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Imagen de portada de la actividad</label>
+          
+          <input 
+            type="url" 
+            id="act-cover-url" 
+            name="coverImageUrl" 
+            value={currentCoverImage} 
+            placeholder="Ingresá la URL de tu imagen (ej: https://...)" 
+            class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+            required 
+          />
+          
+          <div>
+            <p class="text-xs font-semibold text-zinc-500 mb-2">O seleccioná una imagen destacada recomendada:</p>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2" id="preset-grid">
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-zinc-200 hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Picnic / Taller">
+                <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800" alt="Picnic" class="h-full w-full object-cover" />
+              </button>
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1517649763962-0c623266010b?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-zinc-200 hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Deportes">
+                <img src="https://images.unsplash.com/photo-1517649763962-0c623266010b?q=80&w=800" alt="Deportes" class="h-full w-full object-cover" />
+              </button>
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-zinc-200 hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Voluntariado">
+                <img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=800" alt="Voluntariado" class="h-full w-full object-cover" />
+              </button>
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-zinc-200 hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Arte">
+                <img src="https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?q=80&w=800" alt="Arte" class="h-full w-full object-cover" />
+              </button>
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-transparent hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Comunidad">
+                <img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=800" alt="Comunidad" class="h-full w-full object-cover" />
+              </button>
+              <button type="button" data-preset-img="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=800" class="aspect-video rounded-xl overflow-hidden border-2 border-transparent hover:border-emerald-500 transition-all cursor-pointer focus:outline-none" title="Charla">
+                <img src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=800" alt="Charla" class="h-full w-full object-cover" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Previsualización Live -->
+          <div class="aspect-video w-full max-h-48 rounded-2xl overflow-hidden border border-zinc-200 bg-zinc-50 relative mt-2">
+            <img id="cover-preview" src={currentCoverImage} alt="Previsualización" class="h-full w-full object-cover" />
+          </div>
         </div>
 
         <!-- Tags Selection -->
@@ -415,28 +465,32 @@ if (Astro.request.method === 'POST') {
       </div>
 
       <!-- Action Buttons Navigation -->
-      <div class="flex items-center justify-between border-t border-zinc-100 pt-6 mt-6">
+      <div class="flex items-center justify-between border-t border-zinc-100 pt-6 mt-6 gap-3">
         <button 
           type="button" 
           id="btn-prev" 
-          class="hidden items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 px-5 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98]"
+          class="hidden items-center justify-center rounded-2xl border border-zinc-200 hover:bg-zinc-50 px-5 py-3 text-sm font-bold text-zinc-600 transition-all active:scale-[0.98] cursor-pointer"
         >
           Anterior
         </button>
-        <button 
-          type="button" 
-          id="btn-next" 
-          class="ml-auto inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
-        >
-          Siguiente
-        </button>
-        <button 
-          type="submit" 
-          id="btn-submit" 
-          class="hidden inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98]"
-        >
-          {activityToEdit ? 'Guardar Cambios' : 'Publicar Actividad'}
-        </button>
+
+        <div class="ml-auto flex items-center gap-3">
+          <button 
+            type="button" 
+            id="btn-next" 
+            class="inline-flex items-center justify-center rounded-2xl border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-5 py-3 text-sm font-bold transition-all active:scale-[0.98] cursor-pointer"
+          >
+            Siguiente
+          </button>
+          
+          <button 
+            type="submit" 
+            id="btn-submit" 
+            class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            {activityToEdit ? '💾 Guardar Cambios' : 'Publicar Actividad'}
+          </button>
+        </div>
       </div>
 
     </form>
@@ -455,6 +509,36 @@ if (Astro.request.method === 'POST') {
   const registrationTypeSelect = document.getElementById('act-reg-type') as HTMLSelectElement;
   const extUrlContainer = document.getElementById('ext-url-container');
 
+  const coverUrlInput = document.getElementById('act-cover-url') as HTMLInputElement;
+  const coverPreview = document.getElementById('cover-preview') as HTMLImageElement;
+
+  // Live Cover Image Preview & Presets
+  if (coverUrlInput && coverPreview) {
+    coverUrlInput.addEventListener('input', () => {
+      if (coverUrlInput.value.trim()) {
+        coverPreview.src = coverUrlInput.value.trim();
+      }
+    });
+
+    document.querySelectorAll('[data-preset-img]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-preset-img');
+        if (url) {
+          coverUrlInput.value = url;
+          coverPreview.src = url;
+
+          // Highlight selected preset
+          document.querySelectorAll('[data-preset-img]').forEach((b) => {
+            b.classList.remove('border-emerald-500');
+            b.classList.add('border-zinc-200');
+          });
+          btn.classList.remove('border-zinc-200');
+          btn.classList.add('border-emerald-500');
+        }
+      });
+    });
+  }
+
   // Toggle External URL based on registration type selection
   function checkRegType() {
     if (!registrationTypeSelect || !extUrlContainer) return;
@@ -471,7 +555,7 @@ if (Astro.request.method === 'POST') {
 
   if (registrationTypeSelect) {
     registrationTypeSelect.addEventListener('change', checkRegType);
-    checkRegType(); // Initial run
+    checkRegType();
   }
 
   // Multi-step transitions
@@ -495,69 +579,46 @@ if (Astro.request.method === 'POST') {
 
       if (indicator) {
         if (i === step) {
-          indicator.classList.remove('text-zinc-450', 'border-zinc-200');
-          indicator.classList.add('text-emerald-700', 'border-emerald-600');
+          indicator.className = 'border-b-4 border-emerald-600 pb-2 text-emerald-700 font-bold cursor-pointer hover:text-emerald-800 transition-all text-center';
         } else if (i < step) {
-          // completed steps
-          indicator.classList.remove('border-zinc-200', 'text-emerald-700', 'border-emerald-600');
-          indicator.classList.add('text-zinc-500', 'border-emerald-500');
+          indicator.className = 'border-b-4 border-emerald-500 pb-2 text-zinc-600 font-medium cursor-pointer hover:text-emerald-700 transition-all text-center';
         } else {
-          indicator.classList.remove('text-emerald-700', 'border-emerald-600', 'border-emerald-500', 'text-zinc-500');
-          indicator.classList.add('border-zinc-200');
+          indicator.className = 'border-b-4 border-zinc-200 pb-2 text-zinc-400 font-medium cursor-pointer hover:text-emerald-700 transition-all text-center';
         }
       }
     }
 
     // Toggle nav buttons
-    if (btnPrev && btnNext && btnSubmit) {
+    if (btnPrev && btnNext) {
       if (step === 1) {
         btnPrev.classList.remove('inline-flex');
         btnPrev.classList.add('hidden');
-        
-        btnNext.classList.remove('hidden');
-        btnNext.classList.add('inline-flex');
-        
-        btnSubmit.classList.remove('inline-flex');
-        btnSubmit.classList.add('hidden');
-      } else if (step === maxSteps) {
-        btnPrev.classList.remove('hidden');
-        btnPrev.classList.add('inline-flex');
-        
-        btnNext.classList.remove('inline-flex');
-        btnNext.classList.add('hidden');
-        
-        btnSubmit.classList.remove('hidden');
-        btnSubmit.classList.add('inline-flex');
       } else {
         btnPrev.classList.remove('hidden');
         btnPrev.classList.add('inline-flex');
-        
+      }
+
+      if (step === maxSteps) {
+        btnNext.classList.remove('inline-flex');
+        btnNext.classList.add('hidden');
+      } else {
         btnNext.classList.remove('hidden');
         btnNext.classList.add('inline-flex');
-        
-        btnSubmit.classList.remove('inline-flex');
-        btnSubmit.classList.add('hidden');
       }
     }
   }
 
-  // Click listeners
+  // Direct Step Header Navigation
+  document.querySelectorAll('[data-step-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetStep = parseInt(btn.getAttribute('data-step-nav') || '1', 10);
+      updateStep(targetStep);
+    });
+  });
+
+  // Click listeners for Siguiente / Anterior
   if (btnNext) {
     btnNext.addEventListener('click', () => {
-      // Validate current step fields before proceeding
-      const activeSection = document.getElementById(`step-section-${currentStep}`);
-      if (activeSection) {
-        const inputs = activeSection.querySelectorAll('input[required], select[required], textarea[required]');
-        let stepValid = true;
-        inputs.forEach((input: any) => {
-          if (!input.checkValidity()) {
-            input.reportValidity();
-            stepValid = false;
-          }
-        });
-        if (!stepValid) return;
-      }
-      
       if (currentStep < maxSteps) {
         updateStep(currentStep + 1);
       }
