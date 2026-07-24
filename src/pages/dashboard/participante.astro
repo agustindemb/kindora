@@ -7,7 +7,7 @@ import { userRepository } from '../../lib/repositories/userRepository';
 import { notificationService } from '../../services/notificationService';
 import { Calendar, Heart, User, Bell, Settings, Star, AlertCircle, Award, Clock, ShieldCheck, Share2, Trash2, Building2 } from 'lucide-astro';
 
-import { getUserAvatar } from '../../utils/avatar';
+import { getUserAvatar, AVATAR_PRESETS } from '../../utils/avatar';
 
 const currentUser = Astro.locals.user;
 
@@ -71,15 +71,18 @@ if (Astro.request.method === 'POST') {
     if (action === 'update_profile') {
       const name = formData.get('name') as string;
       const phone = formData.get('phone') as string;
+      const image = formData.get('image') as string;
       
       await userRepository.update(currentUser.id, {
         name,
         phone,
+        image,
       });
 
       currentUser.name = name;
       currentUser.phone = phone;
-      successMsg = '¡Tu perfil se actualizó correctamente!';
+      currentUser.image = image;
+      successMsg = '¡Tu perfil y avatar se actualizaron correctamente!';
     } else if (action === 'switch_to_organizer') {
       await userRepository.update(currentUser.id, { role: 'organizer' });
       currentUser.role = 'organizer';
@@ -322,6 +325,57 @@ if (Astro.request.method === 'POST') {
               <p class="text-[10px] text-zinc-400 mt-1">Vinculá tu número celular para habilitar notificaciones por WhatsApp en el futuro.</p>
             </div>
 
+            <!-- Avatar Selection Section -->
+            <div class="space-y-3 pt-2">
+              <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Elegí tu Avatar o Foto de Perfil</label>
+              
+              <!-- Hidden Image Input -->
+              <input type="hidden" id="profile-image" name="image" value={currentUser.image || userImage} />
+
+              <!-- Live Selected Avatar Preview -->
+              <div class="flex items-center gap-4 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                <img 
+                  id="avatar-live-preview" 
+                  src={userImage} 
+                  alt="Avatar Seleccionado" 
+                  class="h-16 w-16 rounded-full object-cover border-2 border-emerald-500 shadow-sm" 
+                />
+                <div>
+                  <h4 class="text-sm font-bold text-zinc-900">Avatar Actual</h4>
+                  <p class="text-xs text-zinc-500">Seleccioná una carita animada o pegá el link de tu propia foto.</p>
+                </div>
+              </div>
+
+              <!-- Animated Faces Grid -->
+              <div class="space-y-2">
+                <p class="text-xs font-bold text-zinc-700">Caritas Animadas Ilustradas:</p>
+                <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 bg-white border border-zinc-200 rounded-2xl p-3 max-h-48 overflow-y-auto">
+                  {AVATAR_PRESETS.map((preset) => (
+                    <button
+                      type="button"
+                      class="avatar-preset-btn flex items-center justify-center rounded-xl p-1.5 border border-zinc-100 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all cursor-pointer group"
+                      data-url={preset.url}
+                      title={preset.name}
+                    >
+                      <img src={preset.url} alt={preset.name} class="h-10 w-10 rounded-full object-cover group-hover:scale-105 transition-transform" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <!-- Custom Photo URL Input -->
+              <div>
+                <label for="custom-avatar-url" class="block text-xs font-bold text-zinc-600 mb-1">O pegá el link de tu propia foto (Google, Imgur, Instagram):</label>
+                <input 
+                  type="url" 
+                  id="custom-avatar-url" 
+                  placeholder="https://..." 
+                  value={currentUser.image || ''}
+                  class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-xs focus:outline-none focus:border-emerald-600 font-medium" 
+                />
+              </div>
+            </div>
+
             <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
               Guardar cambios
             </button>
@@ -423,4 +477,31 @@ if (Astro.request.method === 'POST') {
       if (matchingTab) (matchingTab as HTMLElement).click();
     }
   });
+
+  // Client-side Avatar Picker
+  const profileImageInput = document.getElementById('profile-image') as HTMLInputElement;
+  const avatarPreview = document.getElementById('avatar-live-preview') as HTMLImageElement;
+  const customAvatarUrlInput = document.getElementById('custom-avatar-url') as HTMLInputElement;
+  const presetBtns = document.querySelectorAll('.avatar-preset-btn');
+
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.getAttribute('data-url');
+      if (url && profileImageInput && avatarPreview) {
+        profileImageInput.value = url;
+        avatarPreview.src = url;
+        if (customAvatarUrlInput) customAvatarUrlInput.value = '';
+      }
+    });
+  });
+
+  if (customAvatarUrlInput) {
+    customAvatarUrlInput.addEventListener('input', (e) => {
+      const url = (e.target as HTMLInputElement).value;
+      if (url && profileImageInput && avatarPreview) {
+        profileImageInput.value = url;
+        avatarPreview.src = url;
+      }
+    });
+  }
 </script>
