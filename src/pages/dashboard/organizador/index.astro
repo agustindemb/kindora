@@ -336,7 +336,10 @@ import * as schema from '../../../lib/db/schema';
             <section id="tab-content-actividades" class="space-y-6 block">
               <div class="flex items-center justify-between">
                 <h2 class="text-xl font-bold text-zinc-950">Actividades creadas</h2>
-                <a href="/dashboard/organizador/crear" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all">
+                <a 
+                  href={org?.verificationLevel === 'none' && currentUser.role !== 'admin' ? '/dashboard/organizador/verificar?error=must_verify' : '/dashboard/organizador/crear'} 
+                  class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all"
+                >
                   <PlusCircle class="h-4 w-4" />
                   Nueva actividad
                 </a>
@@ -347,7 +350,10 @@ import * as schema from '../../../lib/db/schema';
                   <span class="text-3xl mb-3">📅</span>
                   <h3 class="text-sm font-bold text-zinc-800">No tenés actividades creadas</h3>
                   <p class="text-xs text-zinc-500 max-w-xs mt-0.5">Comenzá a publicar talleres o voluntariados para conectar con vecinos.</p>
-                  <a href="/dashboard/organizador/crear" class="mt-4 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                  <a 
+                    href={org?.verificationLevel === 'none' && currentUser.role !== 'admin' ? '/dashboard/organizador/verificar?error=must_verify' : '/dashboard/organizador/crear'} 
+                    class="mt-4 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+                  >
                     Crear mi primera actividad
                   </a>
                 </div>

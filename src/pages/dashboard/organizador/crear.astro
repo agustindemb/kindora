@@ -18,6 +18,11 @@ if (userOrgs.length === 0) {
 }
 const org = userOrgs[0];
 
+// Verification Guard: unverified organizations cannot create activities
+if (org.verificationLevel === 'none' && currentUser.role !== 'admin' && currentUser.realRole !== 'admin') {
+  return Astro.redirect('/dashboard/organizador/verificar?error=must_verify');
+}
+
 // Fetch categories, accessibility features & tags
 const categoriesList = await activityRepository.getCategories();
 const accessibilityList = await activityRepository.getAccessibilityFeatures();

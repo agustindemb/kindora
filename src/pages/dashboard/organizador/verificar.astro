@@ -20,7 +20,9 @@ const org = userOrgs[0];
 const isVerified = org.verificationLevel !== 'none';
 
 let successMsg = '';
-let errorMsg = '';
+let errorMsg = Astro.url.searchParams.get('error') === 'must_verify' 
+  ? 'Debés solicitar la verificación de tu organización antes de publicar actividades. El proceso es rápido y garantiza la seguridad de la comunidad.' 
+  : '';
 
 if (Astro.request.method === 'POST') {
   try {
