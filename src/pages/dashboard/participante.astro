@@ -53,8 +53,15 @@ try {
 
 // Split registered activities
 const now = new Date();
-const upcomingInscriptions = (inscriptionsList || []).filter((ins) => ins?.activity?.startsAt && new Date(ins.activity.startsAt) > now && ins.status === 'registered');
-const pastInscriptions = (inscriptionsList || []).filter((ins) => ins?.activity?.startsAt && (new Date(ins.activity.startsAt) <= now || ins.status === 'attended'));
+const upcomingInscriptions = (inscriptionsList || []).filter((ins) => 
+  ins?.activity?.startsAt && 
+  new Date(ins.activity.startsAt) > now && 
+  (ins.status === 'registered' || ins.status === 'volunteer')
+);
+const pastInscriptions = (inscriptionsList || []).filter((ins) => 
+  ins?.activity?.startsAt && 
+  (new Date(ins.activity.startsAt) <= now || ins.status === 'attended')
+);
 
 // Volunteer Impact Profile Metrics
 const totalHours = (inscriptionsList || []).length * 2;
@@ -233,7 +240,15 @@ if (Astro.request.method === 'POST') {
             ) : (
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {upcomingInscriptions.map((ins) => (
-                  <ActivityCard activity={ins.activity} />
+                  <div class="flex flex-col">
+                    {ins.status === 'volunteer' && (
+                      <div class="mb-2.5 inline-flex items-center gap-1.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-1.5 text-xs font-bold text-violet-700 w-fit">
+                        <span>🌱</span>
+                        <span>Postulado/a como voluntario/a</span>
+                      </div>
+                    )}
+                    <ActivityCard activity={ins.activity} />
+                  </div>
                 ))}
               </div>
             )}
