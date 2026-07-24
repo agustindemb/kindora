@@ -398,3 +398,23 @@ export const reviewRelations = relations(reviews, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const analyticsEvents = pgTable("analytics_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventName: text("eventName").notNull(),
+  userId: text("userId"),
+  activityId: uuid("activityId"),
+  organizationId: uuid("organizationId"),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const announcements = pgTable("announcements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  activityId: uuid("activityId").notNull().references(() => activities.id, { onDelete: "cascade" }),
+  organizationId: uuid("organizationId").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+

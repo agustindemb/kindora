@@ -1,0 +1,54 @@
+---
+import { SearchX, CalendarX, HeartOff, Sparkles, FolderX, AlertCircle } from 'lucide-astro';
+
+interface Props {
+  icon?: 'search' | 'calendar' | 'heart' | 'sparkles' | 'folder' | 'alert';
+  title: string;
+  description: string;
+  actionText?: string;
+  actionHref?: string;
+  actionOnClick?: string;
+}
+
+const {
+  icon = 'search',
+  title,
+  description,
+  actionText,
+  actionHref,
+  actionOnClick,
+} = Astro.props;
+---
+
+<div class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-zinc-200 rounded-3xl bg-zinc-50/50 my-6">
+  <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mb-4 shadow-sm">
+    {icon === 'search' && <SearchX class="h-8 w-8" />}
+    {icon === 'calendar' && <CalendarX class="h-8 w-8" />}
+    {icon === 'heart' && <HeartOff class="h-8 w-8" />}
+    {icon === 'sparkles' && <Sparkles class="h-8 w-8" />}
+    {icon === 'folder' && <FolderX class="h-8 w-8" />}
+    {icon === 'alert' && <AlertCircle class="h-8 w-8" />}
+  </div>
+
+  <h3 class="text-lg font-bold text-zinc-900 mb-1">{title}</h3>
+  <p class="text-sm text-zinc-500 max-w-md mb-6 leading-relaxed">{description}</p>
+
+  {actionText && actionHref && (
+    <a 
+      href={actionHref}
+      class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
+    >
+      {actionText}
+    </a>
+  )}
+
+  {actionText && !actionHref && actionOnClick && (
+    <button 
+      type="button" 
+      onclick={actionOnClick}
+      class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
+    >
+      {actionText}
+    </button>
+  )}
+</div>

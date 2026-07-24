@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import ActivityCard from '../components/ActivityCard.astro';
+import EmptyState from '../components/EmptyState.astro';
 import MapComponent from '../components/MapComponent.astro';
 import { activityRepository } from '../lib/repositories/activityRepository';
 import { searchService } from '../services/searchService';
@@ -303,14 +304,13 @@ const getA11yToggleUrl = (id: string) => {
         ) : (
           <>
             {activitiesList.length === 0 ? (
-              <div class="flex flex-col items-center justify-center text-center p-12 border border-dashed border-zinc-200 rounded-2xl bg-zinc-50/20">
-                <span class="text-4xl mb-4">🧩</span>
-                <h3 class="text-base font-bold text-zinc-950">No encontramos actividades</h3>
-                <p class="text-sm text-zinc-500 max-w-sm mt-1">Probá cambiando los filtros o buscando otra palabra clave en tu barrio.</p>
-                <a href="/explorar" class="mt-4 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors">
-                  Ver todas las actividades
-                </a>
-              </div>
+              <EmptyState 
+                icon="search"
+                title="No encontramos actividades que coincidan"
+                description="Probá ajustando tu búsqueda, cambiando la ubicación o quitando los filtros aplicados para descubrir más experiencias."
+                actionText="Limpiar todos los filtros"
+                actionHref="/explorar"
+              />
             ) : (
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {activitiesList.map((act) => (

@@ -1,0 +1,85 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ActivityCard from '../../components/ActivityCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { searchService } from '../../services/searchService';
+import { db } from '../../lib/db/client';
+import { categories } from '../../lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { Sparkles, ArrowRight } from 'lucide-astro';
+
+const { slug } = Astro.params;
+
+let categoryObj: any = null;
+try {
+  const dbCats = await db.select().from(categories).where(eq(categories.slug, slug || '')).limit(1);
+  if (dbCats.length > 0) {
+    categoryObj = dbCats[0];
+  }
+} catch (e) {}
+
+const categoryName = categoryObj?.name || slug?.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Categoría';
+
+const activitiesList = await searchService.search({
+  categoryId: categoryObj?.id || undefined,
+  query: categoryObj ? undefined : categoryName,
+});
+
+const pageTitle = `Actividades de ${categoryName} | Kindora`;
+const pageDescription = `Explorá experiencias, voluntariados e iniciativas inclusivas sobre ${categoryName}. Involucrate en causas comunitarias con propósito.`;
+---
+
+<Layout title={pageTitle}>
+  <!-- Hero Banner for Category -->
+  <section class="bg-gradient-to-b from-emerald-900 via-zinc-900 to-zinc-950 text-white py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px] opacity-15"></div>
+    <div class="relative max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold mb-3">
+          <Sparkles class="h-3.5 w-3.5 text-emerald-400" />
+          Categoría Social
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Actividades de {categoryName}</h1>
+        <p class="text-zinc-300 max-w-xl text-sm sm:text-base mt-2">
+          {pageDescription}
+        </p>
+      </div>
+
+      <a 
+        href="/explorar" 
+        class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition-all"
+      >
+        Todas las categorías
+        <ArrowRight class="h-4 w-4" />
+      </a>
+    </div>
+  </section>
+
+  <!-- Content Section -->
+  <main class="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-2xl font-extrabold text-zinc-900">Iniciativas sobre {categoryName}</h2>
+        <p class="text-sm text-zinc-500 mt-1">
+          {activitiesList.length === 1 ? '1 actividad disponible' : `${activitiesList.length} actividades disponibles`}
+        </p>
+      </div>
+    </div>
+
+    {activitiesList.length === 0 ? (
+      <EmptyState 
+        icon="folder"
+        title={`No hay actividades actuales en ${categoryName}`}
+        description={`Actualmente no encontramos actividades publicadas bajo esta categoría, pero podés explorar otras causas o publicar una nueva.`}
+        actionText="Explorar todas las actividades"
+        actionHref="/explorar"
+      />
+    ) : (
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {activitiesList.map((act) => (
+          <ActivityCard activity={act} />
+        ))}
+      </div>
+    )}
+  </main>
+</Layout>

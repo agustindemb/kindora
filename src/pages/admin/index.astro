@@ -1,10 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { analyticsService } from '../../services/analyticsService';
 import { db } from '../../lib/db/client';
 import { organizations, organizationStats, user, organizationLogs } from '../../lib/db/schema';
 import * as schema from '../../lib/db/schema';
 import { eq, and, isNull, sql, desc } from 'drizzle-orm';
-import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText, ExternalLink, Trash2, ArrowUpRight, Search, Shield, UserCheck, Eye } from 'lucide-astro';
+import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText, ExternalLink, Trash2, ArrowUpRight, Search, Shield, UserCheck, Eye, BarChart3, TrendingUp, Activity } from 'lucide-astro';
 
 const currentUser = Astro.locals.user;
 
@@ -13,7 +15,10 @@ if (!currentUser || (currentUser.role !== 'admin' && currentUser.realRole !== 'a
 }
 
 // Read active tab from query params
-const activeTabParam = Astro.url.searchParams.get('tab') || 'users';
+const activeTabParam = Astro.url.searchParams.get('tab') || 'analytics';
+
+// Fetch analytics metrics
+const analyticsMetrics = await analyticsService.getAdminMetrics();
 
 let stats = {
   usersCount: 0,
@@ -288,11 +293,36 @@ if (Astro.request.method === 'POST') {
     <!-- Interactive Stat Cards (Click to Inspect) -->
     <div>
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Métricas e Inspección Rápida</h2>
-        <span class="text-xs text-purple-600 font-medium">Hacé click en cualquier tarjeta para ver su listado completo</span>
+        <h2 class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Métricas de Plataforma & Analítica</h2>
+        <span class="text-xs text-purple-600 font-medium hidden sm:inline">Hacé click en cualquier tarjeta para inspeccionar</span>
       </div>
       
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 0. Card Analítica -->
+        <button 
+          type="button" 
+          id="btn-tab-analytics"
+          class="tab-trigger w-full text-left rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group relative overflow-hidden"
+          data-target="analytics"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <BarChart3 class="h-5 w-5" />
+              </span>
+              <div>
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Conversión</span>
+                <span class="text-2xl font-black text-zinc-950 block">{analyticsMetrics.conversionRate}%</span>
+              </div>
+            </div>
+            <ArrowUpRight class="h-4 w-4 text-zinc-300 group-hover:text-indigo-600 transition-colors" />
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-zinc-100 flex items-center justify-between text-[11px] text-indigo-700 font-semibold">
+            <span>{analyticsMetrics.totalJoins} registros / {analyticsMetrics.totalViews} vistas</span>
+            <span class="bg-indigo-50 px-1.5 py-0.5 rounded">Detalles &rarr;</span>
+          </div>
+        </button>
+
         <!-- 1. Card Usuarios -->
         <button 
           type="button" 
@@ -301,20 +331,20 @@ if (Astro.request.method === 'POST') {
           data-target="users"
         >
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                <Users class="h-6 w-6" />
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <Users class="h-5 w-5" />
               </span>
               <div>
-                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Usuarios Totales</span>
-                <span class="text-3xl font-black text-zinc-950 block">{stats.usersCount}</span>
+                <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Usuarios</span>
+                <span class="text-2xl font-black text-zinc-950 block">{stats.usersCount}</span>
               </div>
             </div>
-            <ArrowUpRight class="h-5 w-5 text-zinc-300 group-hover:text-purple-600 transition-colors" />
+            <ArrowUpRight class="h-4 w-4 text-zinc-300 group-hover:text-purple-600 transition-colors" />
           </div>
-          <div class="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs text-purple-700 font-semibold">
-            <span>Inspeccionar usuarios</span>
-            <span class="text-[10px] bg-purple-50 px-2 py-0.5 rounded-md">Ver listado &rarr;</span>
+          <div class="mt-3 pt-2.5 border-t border-zinc-100 flex items-center justify-between text-[11px] text-purple-700 font-semibold">
+            <span>DAU: {analyticsMetrics.dau} | WAU: {analyticsMetrics.wau}</span>
+            <span class="bg-purple-50 px-1.5 py-0.5 rounded">Ver listado &rarr;</span>
           </div>
         </button>
 

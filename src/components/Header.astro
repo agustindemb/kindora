@@ -1,5 +1,5 @@
 ---
-import { Heart, Search, Bell, User, LogOut, LayoutDashboard, PlusCircle, Building2, Eye, Shield } from 'lucide-astro';
+import { Heart, Search, Bell, User, LogOut, LayoutDashboard, PlusCircle, Building2, Eye, Shield, Menu, X } from 'lucide-astro';
 import { db } from '../lib/db/client';
 import { notifications } from '../lib/db/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
@@ -22,7 +22,7 @@ if (user) {
 }
 ---
 
-<header class="sticky top-0 z-50 w-full border-b border-zinc-100 bg-white/80 backdrop-blur-md">
+<header class="sticky top-0 z-50 w-full border-b border-zinc-100 bg-white/90 backdrop-blur-md">
   {isAdminUser && (
     <div class="bg-gradient-to-r from-purple-950 via-zinc-900 to-purple-950 text-white text-xs font-semibold px-4 py-1.5 flex flex-wrap items-center justify-between gap-2 border-b border-purple-900/50">
       <div class="flex items-center gap-2">
@@ -77,11 +77,11 @@ if (user) {
       <span class="text-xl font-bold tracking-tight text-zinc-900">Kindora</span>
     </a>
 
-    <!-- Navigation links -->
+    <!-- Desktop Navigation links -->
     <nav class="hidden md:flex items-center gap-6">
       <a 
         href="/explorar" 
-        class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/explorar') ? 'text-emerald-600' : 'text-zinc-600'}`}
+        class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/explorar') ? 'text-emerald-600 font-semibold' : 'text-zinc-600'}`}
         id="nav-link-explore"
       >
         Explorá Actividades
@@ -90,13 +90,13 @@ if (user) {
         <>
           <a 
             href="/dashboard/organizador" 
-            class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/dashboard/organizador') ? 'text-emerald-600' : 'text-zinc-600'}`}
+            class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/dashboard/organizador') ? 'text-emerald-600 font-semibold' : 'text-zinc-600'}`}
           >
             Mi Organización
           </a>
           <a 
             href="/dashboard/organizador/crear" 
-            class="flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+            class="flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 font-semibold"
           >
             <PlusCircle class="h-4 w-4" />
             Creá una Actividad
@@ -107,7 +107,7 @@ if (user) {
         <>
           <a 
             href="/dashboard/participante" 
-            class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/dashboard/participante') ? 'text-emerald-600' : 'text-zinc-600'}`}
+            class={`text-sm font-medium transition-colors hover:text-emerald-600 ${activePath.startsWith('/dashboard/participante') ? 'text-emerald-600 font-semibold' : 'text-zinc-600'}`}
           >
             Mis Actividades
           </a>
@@ -123,17 +123,17 @@ if (user) {
       {user && user.role === 'admin' && (
         <a 
           href="/admin" 
-          class="text-sm font-medium text-purple-600 hover:text-purple-700"
+          class="text-sm font-semibold text-purple-600 hover:text-purple-700"
         >
           Panel Administrador
         </a>
       )}
     </nav>
 
-    <!-- User Action buttons -->
-    <div class="flex items-center gap-4">
+    <!-- User Action & Mobile Toggle -->
+    <div class="flex items-center gap-3">
       {user ? (
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
           <!-- Notification Bell -->
           <a href={user.role === 'organizer' ? '/dashboard/organizador#notificaciones' : '/dashboard/participante#notificaciones'} class="relative p-2 rounded-lg text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all" aria-label="Notificaciones">
             <Bell class="h-5 w-5" />
@@ -143,7 +143,7 @@ if (user) {
           </a>
 
           <!-- User Menu Dropdown (Interactive) -->
-          <div class="relative group">
+          <div class="relative group hidden sm:block">
             <button 
               type="button" 
               class="flex items-center gap-2 p-1 rounded-full border border-zinc-200 hover:border-zinc-300 transition-all"
@@ -155,6 +155,7 @@ if (user) {
                 src={user.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.name}`} 
                 alt={user.name} 
                 class="h-8 w-8 rounded-full object-cover"
+                onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';"
               />
             </button>
             
@@ -163,11 +164,6 @@ if (user) {
               <div class="px-3 py-2 border-b border-zinc-50">
                 <p class="text-sm font-semibold text-zinc-900 leading-none mb-1">{user.name}</p>
                 <p class="text-xs text-zinc-500 truncate leading-none">{user.email}</p>
-                {user.isImpersonating && (
-                  <span class="mt-1.5 inline-block text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    Simulando: {user.role.toUpperCase()}
-                  </span>
-                )}
               </div>
               <div class="py-1">
                 {user.role === 'organizer' ? (
@@ -187,13 +183,10 @@ if (user) {
                     Panel Administrador
                   </a>
                 )}
-                <a href={user.role === 'organizer' ? '/dashboard/organizador#configuracion' : '/dashboard/participante#perfil'} class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors">
-                  Configuración
-                </a>
               </div>
               <div class="border-t border-zinc-50 pt-1">
                 <form action="/auth/logout" method="POST" class="m-0">
-                  <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-lg text-rose-600 hover:bg-rose-50 transition-colors text-left">
+                  <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-lg text-rose-600 hover:bg-rose-50 transition-colors text-left font-medium">
                     <LogOut class="h-4 w-4 text-rose-400" />
                     Cerrar sesión
                   </button>
@@ -216,6 +209,107 @@ if (user) {
           </a>
         </div>
       )}
+
+      <!-- Mobile Hamburger Button -->
+      <button 
+        type="button" 
+        id="mobile-menu-toggle"
+        class="md:hidden p-2 rounded-xl text-zinc-600 hover:bg-zinc-100 transition-all focus:outline-none"
+        aria-label="Abrir menú"
+      >
+        <Menu class="h-6 w-6 block" id="menu-icon-open" />
+        <X class="h-6 w-6 hidden" id="menu-icon-close" />
+      </button>
     </div>
   </div>
+
+  <!-- Mobile Dropdown Navigation Drawer -->
+  <div id="mobile-menu" class="hidden md:hidden border-t border-zinc-100 bg-white px-4 py-6 shadow-xl space-y-4">
+    <div class="space-y-2">
+      <a href="/explorar" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-zinc-800 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+        🔍 Explorá Actividades
+      </a>
+      {user && user.role === 'organizer' && (
+        <>
+          <a href="/dashboard/organizador" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-zinc-800 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+            🏢 Mi Organización
+          </a>
+          <a href="/dashboard/organizador/crear" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-emerald-600 hover:bg-emerald-50 transition-all">
+            ➕ Creá una Actividad
+          </a>
+        </>
+      )}
+      {user && user.role === 'participant' && (
+        <>
+          <a href="/dashboard/participante" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-zinc-800 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+            📋 Mis Actividades
+          </a>
+          <a href="/dashboard/participante#favoritos" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-zinc-800 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+            ❤️ Guardados
+          </a>
+        </>
+      )}
+      {user && user.role === 'admin' && (
+        <a href="/admin" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-purple-700 hover:bg-purple-50 transition-all">
+          🛡️ Panel Administrador
+        </a>
+      )}
+    </div>
+
+    {user ? (
+      <div class="pt-4 border-t border-zinc-100 space-y-3">
+        <div class="flex items-center gap-3 px-3 py-2 bg-zinc-50 rounded-xl">
+          <img 
+            src={user.image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.name}`} 
+            alt={user.name} 
+            class="h-10 w-10 rounded-full object-cover"
+          />
+          <div>
+            <p class="text-sm font-bold text-zinc-900 leading-tight">{user.name}</p>
+            <p class="text-xs text-zinc-500 truncate leading-tight">{user.email}</p>
+          </div>
+        </div>
+        <form action="/auth/logout" method="POST" class="m-0">
+          <button type="submit" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-all">
+            <LogOut class="h-4 w-4" />
+            Cerrar sesión
+          </button>
+        </form>
+      </div>
+    ) : (
+      <div class="pt-4 border-t border-zinc-100 space-y-2">
+        <a href="/login" class="block w-full text-center py-2.5 rounded-xl border border-zinc-200 text-sm font-bold text-zinc-800 hover:bg-zinc-50 transition-all">
+          Iniciar sesión
+        </a>
+        <a href="/login?role=organizer" class="block w-full text-center py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all">
+          Sumar mi organización
+        </a>
+      </div>
+    )}
+  </div>
 </header>
+
+<script>
+  const toggleBtn = document.getElementById('mobile-menu-toggle');
+  const mobileMenu = document.getElementById('mobile-menu');
+  const iconOpen = document.getElementById('menu-icon-open');
+  const iconClose = document.getElementById('menu-icon-close');
+
+  toggleBtn?.addEventListener('click', () => {
+    const isHidden = mobileMenu?.classList.contains('hidden');
+    if (isHidden) {
+      mobileMenu?.classList.remove('hidden');
+      iconOpen?.classList.add('hidden');
+      iconOpen?.classList.remove('block');
+      iconClose?.classList.remove('hidden');
+      iconClose?.classList.add('block');
+    } else {
+      mobileMenu?.classList.add('hidden');
+      iconOpen?.classList.remove('hidden');
+      iconOpen?.classList.add('block');
+      iconClose?.classList.add('hidden');
+      iconClose?.classList.remove('block');
+    }
+  });
+</script>
+

@@ -1,0 +1,81 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ActivityCard from '../../components/ActivityCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { searchService } from '../../services/searchService';
+import { MapPin, Sparkles, ArrowRight } from 'lucide-astro';
+
+const { slug } = Astro.params;
+
+// Map city slug to real city name
+const cityMap: Record<string, string> = {
+  'buenos-aires': 'Buenos Aires',
+  'cordoba': 'Córdoba Capital',
+  'rosario': 'Rosario',
+  'tigre': 'Tigre',
+};
+
+const cityName = cityMap[slug || ''] || slug?.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Tu Ciudad';
+
+const activitiesList = await searchService.search({
+  city: cityName === 'Tigre' ? 'Tigre' : cityName,
+});
+
+const pageTitle = `Actividades Sociales e Inclusivas en ${cityName} | Kindora`;
+const pageDescription = `Descubrí voluntariados, talleres y actividades accesibles en ${cityName}. Sumate a causas locales con impacto social real.`;
+---
+
+<Layout title={pageTitle}>
+  <!-- Hero Banner for City -->
+  <section class="bg-gradient-to-b from-emerald-900 via-zinc-900 to-zinc-950 text-white py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px] opacity-15"></div>
+    <div class="relative max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold mb-3">
+          <MapPin class="h-3.5 w-3.5" />
+          Ciudad Destacada
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Actividades en {cityName}</h1>
+        <p class="text-zinc-300 max-w-xl text-sm sm:text-base mt-2">
+          {pageDescription}
+        </p>
+      </div>
+
+      <a 
+        href="/explorar" 
+        class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition-all"
+      >
+        Explorar todas las ciudades
+        <ArrowRight class="h-4 w-4" />
+      </a>
+    </div>
+  </section>
+
+  <!-- Content Section -->
+  <main class="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-2xl font-extrabold text-zinc-900">Experiencias en {cityName}</h2>
+        <p class="text-sm text-zinc-500 mt-1">
+          {activitiesList.length === 1 ? '1 actividad disponible' : `${activitiesList.length} actividades disponibles`}
+        </p>
+      </div>
+    </div>
+
+    {activitiesList.length === 0 ? (
+      <EmptyState 
+        icon="search"
+        title={`Próximamente más actividades en ${cityName}`}
+        description={`Actualmente no hay actividades publicadas en ${cityName}, pero podés explorar otras ciudades o registrar tu organización.`}
+        actionText="Ver todas las actividades"
+        actionHref="/explorar"
+      />
+    ) : (
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {activitiesList.map((act) => (
+          <ActivityCard activity={act} />
+        ))}
+      </div>
+    )}
+  </main>
+</Layout>
