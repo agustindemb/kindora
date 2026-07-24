@@ -534,7 +534,7 @@ export const activityRepository = {
     offset?: number;
   } = {}): Promise<ActivityWithDetails[]> {
     try {
-      const conditions = [isNull(activities.deletedAt)];
+      const conditions = [isNull(activities.deletedAt), isNull(organizations.deletedAt)];
       if (filters.status) conditions.push(eq(activities.status, filters.status));
       else conditions.push(eq(activities.status, "published"));
       if (filters.visibility) conditions.push(eq(activities.visibility, filters.visibility));
@@ -552,7 +552,8 @@ export const activityRepository = {
         .select({ id: activities.id })
         .from(activities)
         .innerJoin(locations, eq(activities.locationId, locations.id))
-        .innerJoin(categories, eq(activities.categoryId, categories.id));
+        .innerJoin(categories, eq(activities.categoryId, categories.id))
+        .innerJoin(organizations, eq(activities.organizationId, organizations.id));
 
       if (filters.city) conditions.push(eq(locations.city, filters.city));
       if (filters.tagSlug) {

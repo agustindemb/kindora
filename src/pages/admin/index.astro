@@ -33,10 +33,21 @@ let allOrgsList: any[] = [];
 let allActivitiesList: any[] = [];
 
 try {
+  // 0. Auto cleanup existing orphaned activities from soft-deleted organizations
+  try {
+    await db.update(schema.activities)
+      .set({ deletedAt: new Date() })
+      .where(sql`${schema.activities.organizationId} IN (SELECT id FROM organizations WHERE "deletedAt" IS NOT NULL) AND ${schema.activities.deletedAt} IS NULL`);
+  } catch (e) {}
+
   // 1. Fetch counts
   const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user);
   const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
-  const actsRes = await db.select({ count: sql`count(${schema.activities.id})::int` }).from(schema.activities).where(isNull(schema.activities.deletedAt));
+  const actsRes = await db
+    .select({ count: sql`count(${schema.activities.id})::int` })
+    .from(schema.activities)
+    .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+    .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)));
   
   stats = {
     usersCount: usersRes[0]?.count || 0,
@@ -70,9 +81,9 @@ try {
       categoryName: schema.categories.name,
     })
     .from(schema.activities)
-    .leftJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+    .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
     .leftJoin(schema.categories, eq(schema.activities.categoryId, schema.categories.id))
-    .where(isNull(schema.activities.deletedAt))
+    .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)))
     .orderBy(desc(schema.activities.createdAt));
 
   // 3. Fetch unverified organizations
@@ -253,11 +264,10 @@ if (Astro.request.method === 'POST') {
 
     } else if (action === 'delete_organization') {
       const orgId = formData.get('organizationId') as string;
-      await db.update(organizations).set({
-        deletedAt: new Date()
-      }).where(eq(organizations.id, orgId));
+      const { organizationRepository } = await import('../../lib/repositories/organizationRepository');
+      await organizationRepository.softDelete(orgId);
 
-      successMsg = 'Organización eliminada correctamente.';
+      successMsg = 'Organización y sus actividades asociadas eliminadas correctamente.';
       return Astro.redirect('/admin?tab=orgs');
     }
   } catch (err: any) {
