@@ -38,9 +38,9 @@ const activitiesList = await searchService.search({
   query: queryParam,
   categoryId: categoryParam,
   city: cityParam,
+  when: whenParam,
   isFree: freeParam ? true : undefined,
   a11yIds: a11yParams,
-  // We can pass when parameters directly by editing searchService.ts or let it handle it
 });
 
 // Map markers
@@ -100,8 +100,36 @@ const getA11yToggleUrl = (id: string) => {
         </p>
       </div>
 
-      <!-- Toolbar -->
-      <div class="flex flex-wrap items-center gap-3">
+      <!-- Search Form in Top Toolbar -->
+      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <form action="/explorar" method="GET" class="m-0 flex items-center gap-2 w-full sm:w-80">
+          {categoryParam && <input type="hidden" name="category" value={categoryParam} />}
+          {cityParam && <input type="hidden" name="city" value={cityParam} />}
+          {whenParam && <input type="hidden" name="when" value={whenParam} />}
+          {freeParam && <input type="hidden" name="free" value="true" />}
+          {a11yParams.map(val => <input type="hidden" name="a11y" value={val} />)}
+          {viewParam && <input type="hidden" name="view" value={viewParam} />}
+
+          <div class="relative w-full">
+            <input 
+              type="text" 
+              name="query" 
+              value={queryParam}
+              placeholder="Buscar por palabra clave..."
+              class="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 bg-white placeholder-zinc-400 font-medium shadow-sm"
+            />
+            <Search class="h-4 w-4 text-zinc-400 absolute left-3 top-2.5" />
+            {queryParam && (
+              <a href={buildFilterUrl('query', null)} class="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600 text-xs font-bold">
+                ✕
+              </a>
+            )}
+          </div>
+          <button type="submit" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all flex-shrink-0">
+            Buscar
+          </button>
+        </form>
+
         <!-- View Toggle Buttons -->
         <div class="inline-flex rounded-xl bg-zinc-100 p-1 border border-zinc-200/50">
           <a 

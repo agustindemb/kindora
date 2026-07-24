@@ -7,6 +7,7 @@ export interface SearchFilters {
   query?: string;
   categoryId?: string;
   city?: string;
+  when?: string;
   dateFrom?: Date;
   dateTo?: Date;
   isFree?: boolean;
@@ -14,12 +15,17 @@ export interface SearchFilters {
   status?: string;
 }
 
+const normalizeText = (str: string) =>
+  str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 export const searchService = {
   async search(filters: SearchFilters = {}): Promise<ActivityWithDetails[]> {
-    let queryText = filters.query?.trim().toLowerCase() || "";
+    let rawQuery = [filters.query || "", filters.when || ""].join(" ").trim();
+    let queryText = normalizeText(rawQuery);
+    
     const conditions = [isNull(activities.deletedAt)];
 
-    // Standard filters
+    // Standard status filter
     if (filters.status) {
       conditions.push(eq(activities.status, filters.status));
     } else {
@@ -38,24 +44,23 @@ export const searchService = {
     }
 
     let searchIsFree = filters.isFree;
-    let dayOfWeekFilter: number[] | null = null; // 0=Sunday, 6=Saturday etc
+    let dayOfWeekFilter: number[] | null = null; // 0=Sunday, 6=Saturday
 
     // Intelligent query parser
     if (queryText) {
       // 1. Detect "gratis" or "free"
       if (queryText.includes("gratis") || queryText.includes("free")) {
         searchIsFree = true;
-        // remove term to not clutter text search
         queryText = queryText.replace(/\bgratis\b/g, "").replace(/\bfree\b/g, "").trim();
       }
 
       // 2. Detect days of the week
-      if (queryText.includes("sabado") || queryText.includes("sábado")) {
+      if (queryText.includes("sabado") || queryText.includes("sabados")) {
         dayOfWeekFilter = [6];
-        queryText = queryText.replace(/\bs[aá]bado\b/g, "").trim();
-      } else if (queryText.includes("domingo")) {
+        queryText = queryText.replace(/\bsabados?\b/g, "").trim();
+      } else if (queryText.includes("domingo") || queryText.includes("domingos")) {
         dayOfWeekFilter = [0];
-        queryText = queryText.replace(/\bdomingo\b/g, "").trim();
+        queryText = queryText.replace(/\bdomingos?\b/g, "").trim();
       } else if (queryText.includes("fin de semana") || queryText.includes("finde")) {
         dayOfWeekFilter = [0, 6];
         queryText = queryText.replace(/\bfin de semana\b/g, "").replace(/\bfinde\b/g, "").trim();
@@ -65,16 +70,14 @@ export const searchService = {
     // Apply resolved isFree filter
     if (searchIsFree !== undefined) {
       if (searchIsFree) {
-        conditions.push(eq(activities.price, "0.00"));
+        conditions.push(sql`${activities.price}::numeric = 0`);
       } else {
-        conditions.push(sql`${activities.price} > 0`);
+        conditions.push(sql`${activities.price}::numeric > 0`);
       }
     }
 
-    // Apply day of week filter
+    // Apply day of week filter (Postgres DOW: 0=Sunday, 6=Saturday)
     if (dayOfWeekFilter !== null) {
-      // In Postgres, extract(dow from startsAt) returns 0 (Sunday) to 6 (Saturday)
-      // Drizzle sql helper
       const dowCondition = or(
         ...dayOfWeekFilter.map(
           (dow) => sql`extract(dow from ${activities.startsAt}) = ${dow}`
@@ -94,8 +97,6 @@ export const searchService = {
     }
 
     try {
-      // Get matching activity IDs
-      // If we have text query left, search in title, description, city, category, organization name, and tags.
       let baseQuery = db
         .select({ id: activities.id })
         .from(activities)
@@ -107,28 +108,27 @@ export const searchService = {
         const words = queryText.split(/\s+/).filter(Boolean);
         
         for (const word of words) {
-          const likePattern = `%${word}%`;
+          const normWord = normalizeText(word);
+          const pattern = `%${normWord}%`;
           
-          // Find tags matching the word
+          // Accent-insensitive SQL translation
+          const textConditions = [
+            sql`translate(lower(${activities.title}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            sql`translate(lower(${activities.description}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            sql`translate(lower(${locations.city}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            sql`translate(lower(${locations.address}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            sql`translate(lower(${categories.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            sql`translate(lower(${organizations.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+          ];
+
+          // Check tags
           const matchingTags = await db
             .select({ id: tags.id })
             .from(tags)
-            .where(ilike(tags.name, likePattern));
+            .where(sql`translate(lower(${tags.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`);
             
           const tagIds = matchingTags.map(t => t.id);
-
-          const textConditions = [
-            ilike(activities.title, likePattern),
-            ilike(activities.description, likePattern),
-            ilike(locations.city, likePattern),
-            ilike(locations.address, likePattern),
-            ilike(categories.name, likePattern),
-            ilike(organizations.name, likePattern),
-          ];
-
-          // If matching tags were found, allow match on activity tags
           if (tagIds.length > 0) {
-            // We can query activity tags
             const actWithTags = await db
               .select({ activityId: activityTags.activityId })
               .from(activityTags)
@@ -152,7 +152,7 @@ export const searchService = {
 
       if (matchedIds.length === 0) return [];
 
-      // Fetch full details and accessibility
+      // Fetch full details
       const enrichedResults = await Promise.all(
         matchedIds.map((m) => activityRepository.findById(m.id))
       );
@@ -168,8 +168,7 @@ export const searchService = {
 
       return results;
     } catch (error) {
-      console.warn("DB Connection failed in searchService, using in-memory mock search fallback.");
-      // Fallback search logic in mock repository
+      console.warn("DB Connection failed in searchService, using in-memory mock search fallback:", error);
       let results = await activityRepository.list({
         categoryId: filters.categoryId,
         city: filters.city,
@@ -180,29 +179,27 @@ export const searchService = {
         dateTo: filters.dateTo,
       });
 
-      // Filter queryText in mocks if query is present
       if (queryText) {
         const words = queryText.split(/\s+/).filter(Boolean);
         results = results.filter((act) => {
           return words.every((word) => {
-            const pattern = word.toLowerCase();
+            const normWord = normalizeText(word);
             return (
-              act.title.toLowerCase().includes(pattern) ||
-              act.description.toLowerCase().includes(pattern) ||
-              act.location.city.toLowerCase().includes(pattern) ||
-              act.location.address.toLowerCase().includes(pattern) ||
-              act.category.name.toLowerCase().includes(pattern) ||
-              act.organization.name.toLowerCase().includes(pattern) ||
-              act.tags.some((t) => t.name.toLowerCase().includes(pattern))
+              normalizeText(act.title).includes(normWord) ||
+              normalizeText(act.description).includes(normWord) ||
+              normalizeText(act.location.city).includes(normWord) ||
+              normalizeText(act.location.address).includes(normWord) ||
+              normalizeText(act.category.name).includes(normWord) ||
+              normalizeText(act.organization.name).includes(normWord) ||
+              act.tags.some((t) => normalizeText(t.name).includes(normWord))
             );
           });
         });
       }
 
-      // Filter days of the week in mocks
       if (dayOfWeekFilter !== null) {
         results = results.filter((act) => {
-          const day = new Date(act.startsAt).getDay(); // 0=Sunday, 6=Saturday
+          const day = new Date(act.startsAt).getDay();
           return dayOfWeekFilter!.includes(day);
         });
       }
