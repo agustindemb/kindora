@@ -1,7 +1,8 @@
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { organizations, organizationMembers, organizationStats, follows, user } from "../db/schema";
+import { organizations, organizationMembers, organizationStats, follows, user, activities } from "../db/schema";
 import { mockOrganizations, mockOrganizationStats } from "../db/mocks";
+import { activeActivities } from "./activityRepository";
 
 export type OrganizationSelect = typeof organizations.$inferSelect;
 export type OrganizationInsert = typeof organizations.$inferInsert;
@@ -144,6 +145,20 @@ export const organizationRepository = {
 
   async softDelete(id: string): Promise<OrganizationSelect> {
     try {
+      // 1. Soft delete all activities associated with this organization
+      await db
+        .update(activities)
+        .set({ deletedAt: new Date() })
+        .where(eq(activities.organizationId, id));
+
+      // Also soft-delete in mock store
+      activeActivities.forEach((act) => {
+        if (act.organizationId === id) {
+          act.deletedAt = new Date();
+        }
+      });
+
+      // 2. Soft delete the organization
       const results = await db
         .update(organizations)
         .set({ deletedAt: new Date() })
@@ -152,6 +167,12 @@ export const organizationRepository = {
       return results[0];
     } catch (error) {
       console.warn("DB Connection failed, simulating organization soft delete.");
+      activeActivities.forEach((act) => {
+        if (act.organizationId === id) {
+          act.deletedAt = new Date();
+        }
+      });
+
       const idx = activeOrgs.findIndex(o => o.id === id);
       if (idx !== -1) {
         activeOrgs[idx].deletedAt = new Date();
