@@ -369,37 +369,52 @@ const jsonLd = {
             </div>
           )}
 
-          {/* Form to leave a review (if has attended & logged in) */}
-          {currentUser && hasAttended && (
-            <div class="rounded-2xl border border-zinc-100 p-6 bg-emerald-50/20">
-              <h3 class="text-base font-bold text-zinc-950 mb-2">Dejanos tu opinión</h3>
-              <p class="text-xs text-zinc-500 mb-4">Ayudanos a generar más confianza e incentivar a otras familias a sumarse.</p>
-              <form action="/api/opiniones" method="POST" class="space-y-4">
+          <!-- Form to leave a review / rating -->
+          {currentUser ? (
+            <div id="review-form-box" class="rounded-2xl border border-emerald-100 p-6 bg-emerald-50/30 space-y-4">
+              <div>
+                <h3 class="text-base font-bold text-zinc-950 mb-1">Dejanos tu opinión y calificación</h3>
+                <p class="text-xs text-zinc-500">Tu calificación contribuye al puntaje general de la organización.</p>
+              </div>
+
+              <form id="activity-review-form" class="space-y-4">
                 <input type="hidden" name="activityId" value={activity.id} />
+                
                 <div>
                   <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Calificación</label>
-                  <select name="rating" class="rounded-xl border border-zinc-200 bg-white p-2.5 text-sm focus:outline-none focus:border-emerald-600 font-medium">
-                    <option value="5">⭐⭐⭐⭐⭐ (Excelente)</option>
-                    <option value="4">⭐⭐⭐⭐ (Muy Bueno)</option>
-                    <option value="3">⭐⭐⭐ (Bueno)</option>
-                    <option value="2">⭐⭐ (Regular)</option>
-                    <option value="1">⭐ (Malo)</option>
+                  <select id="review-rating-select" name="rating" class="rounded-xl border border-zinc-200 bg-white p-2.5 text-sm focus:outline-none focus:border-emerald-600 font-bold text-zinc-800">
+                    <option value="5">⭐⭐⭐⭐⭐ 5/5 (Excelente)</option>
+                    <option value="4">⭐⭐⭐⭐ 4/5 (Muy Bueno)</option>
+                    <option value="3">⭐⭐⭐ 3/5 (Bueno)</option>
+                    <option value="2">⭐⭐ 2/5 (Regular)</option>
+                    <option value="1">⭐ 1/5 (Malo)</option>
                   </select>
                 </div>
+
                 <div>
-                  <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Comentario</label>
+                  <label for="review-comment" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Comentario</label>
                   <textarea 
+                    id="review-comment"
                     name="comment" 
                     rows="3" 
-                    placeholder="Contanos tu experiencia..."
+                    placeholder="Contanos qué te pareció la actividad y la atención del equipo..."
                     class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"
                     required
                   ></textarea>
                 </div>
-                <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors">
-                  Enviar opinión
+
+                <button 
+                  type="submit" 
+                  id="submit-review-btn"
+                  class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all cursor-pointer"
+                >
+                  Publicar opinión
                 </button>
               </form>
+            </div>
+          ) : (
+            <div class="rounded-2xl border border-dashed border-zinc-200 p-5 bg-zinc-50 text-center text-xs text-zinc-500">
+              <a href="/login" class="font-bold text-emerald-600 hover:underline">Iniciá sesión</a> para calificar esta actividad y a la organización.
             </div>
           )}
         </div>
@@ -683,6 +698,37 @@ const jsonLd = {
       document.getElementById('register-inscription-btn')?.addEventListener('click', () => handleInscription('register'));
       document.getElementById('volunteer-btn')?.addEventListener('click', () => handleInscription('volunteer'));
       document.getElementById('cancel-inscription-btn')?.addEventListener('click', () => handleInscription('cancel'));
+
+      // Handle Review Form Submission
+      const reviewForm = document.getElementById('activity-review-form');
+      if (reviewForm) {
+        reviewForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const actId = (reviewForm.querySelector('[name="activityId"]') as HTMLInputElement)?.value;
+          const ratingVal = (reviewForm.querySelector('[name="rating"]') as HTMLSelectElement)?.value;
+          const commentVal = (reviewForm.querySelector('[name="comment"]') as HTMLTextAreaElement)?.value;
+
+          try {
+            const res = await fetch('/api/resenas', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ activityId: actId, rating: ratingVal, comment: commentVal }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+              alert(data.error || 'Error al enviar la reseña.');
+              return;
+            }
+
+            alert(data.message || '¡Reseña publicada con éxito!');
+            window.location.reload();
+          } catch (err) {
+            console.error('Error submitting review:', err);
+            alert('Error de conexión.');
+          }
+        });
+      }
     </script>
 
     <!-- Similar Activities Section -->

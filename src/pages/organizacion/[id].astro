@@ -186,9 +186,73 @@ const formattedFoundedDate = org.foundedAt
 
         <!-- Reviews Tab -->
         <div class="space-y-6">
-          <h2 class="text-xl font-bold text-zinc-950">Reseñas de la comunidad ({reviewsList.length})</h2>
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-zinc-950">Reseñas de la comunidad ({reviewsList.length})</h2>
+            <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-3 py-1 rounded-xl">
+              <Star class="h-4 w-4 fill-amber-400 text-amber-400" />
+              <span class="text-xs font-extrabold text-amber-800">{stats?.rating || '0.00'}</span>
+            </div>
+          </div>
+
+          <!-- Rate Org Form Box -->
+          {currentUser ? (
+            <div class="rounded-2xl border border-emerald-100 p-6 bg-emerald-50/20 space-y-4">
+              <h3 class="text-base font-bold text-zinc-950">⭐ Dejar una reseña sobre {org.name}</h3>
+              <p class="text-xs text-zinc-500">Dejá tu opinión para la organización y ayudá a otros usuarios a conocer su impacto.</p>
+              
+              <form id="org-review-form" class="space-y-4">
+                {allOrgActivities.length > 0 ? (
+                  <div>
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Actividad asociada</label>
+                    <select name="activityId" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium">
+                      {allOrgActivities.map((act) => (
+                        <option value={act.id}>{act.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <input type="hidden" name="activityId" value="" />
+                )}
+
+                <div>
+                  <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Calificación</label>
+                  <select name="rating" class="rounded-xl border border-zinc-200 bg-white p-2.5 text-sm focus:outline-none focus:border-emerald-600 font-bold text-zinc-800">
+                    <option value="5">⭐⭐⭐⭐⭐ 5/5 (Excelente)</option>
+                    <option value="4">⭐⭐⭐⭐ 4/5 (Muy Bueno)</option>
+                    <option value="3">⭐⭐⭐ 3/5 (Bueno)</option>
+                    <option value="2">⭐⭐ 2/5 (Regular)</option>
+                    <option value="1">⭐ 1/5 (Malo)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="org-review-comment" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Tu opinión</label>
+                  <textarea 
+                    id="org-review-comment"
+                    name="comment" 
+                    rows="3" 
+                    placeholder="Contanos tu experiencia con esta organización..."
+                    class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium"
+                    required
+                  ></textarea>
+                </div>
+
+                <button 
+                  type="submit" 
+                  class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all cursor-pointer"
+                >
+                  Enviar reseña
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div class="rounded-2xl border border-dashed border-zinc-200 p-5 bg-zinc-50 text-center text-xs text-zinc-500">
+              <a href="/login" class="font-bold text-emerald-600 hover:underline">Iniciá sesión</a> para calificar a esta organización.
+            </div>
+          )}
+
           {reviewsList.length === 0 ? (
-            <p class="text-sm text-zinc-500">No se han registrado opiniones de los participantes para esta organización todavía.</p>
+            <p class="text-sm text-zinc-500 bg-zinc-50/50 rounded-xl p-5 border border-dashed border-zinc-200">No se han registrado opiniones de los participantes para esta organización todavía. ¡Sé el primero en dejar una!</p>
           ) : (
             <div class="grid grid-cols-1 gap-4">
               {reviewsList.map((rev) => (
@@ -281,4 +345,41 @@ const formattedFoundedDate = org.foundedAt
 
     </div>
   </div>
+
+  <script>
+    const orgReviewForm = document.getElementById('org-review-form');
+    if (orgReviewForm) {
+      orgReviewForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const activityId = (orgReviewForm.querySelector('[name="activityId"]') as HTMLSelectElement | HTMLInputElement)?.value;
+        const rating = (orgReviewForm.querySelector('[name="rating"]') as HTMLSelectElement)?.value;
+        const comment = (orgReviewForm.querySelector('[name="comment"]') as HTMLTextAreaElement)?.value;
+
+        if (!activityId) {
+          alert('Esta organización aún no tiene actividades para asociar la reseña.');
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/resenas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activityId, rating, comment }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || 'Error al enviar la reseña.');
+            return;
+          }
+
+          alert(data.message || '¡Reseña guardada con éxito!');
+          window.location.reload();
+        } catch (err) {
+          console.error('Error submitting org review:', err);
+          alert('Error de conexión.');
+        }
+      });
+    }
+  </script>
 </Layout>
