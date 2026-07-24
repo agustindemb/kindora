@@ -103,9 +103,9 @@ export const activityRepository = {
           org: organizations,
         })
         .from(activities)
-        .innerJoin(locations, eq(activities.locationId, locations.id))
-        .innerJoin(categories, eq(activities.categoryId, categories.id))
-        .innerJoin(organizations, eq(activities.organizationId, organizations.id))
+        .leftJoin(locations, eq(activities.locationId, locations.id))
+        .leftJoin(categories, eq(activities.categoryId, categories.id))
+        .leftJoin(organizations, eq(activities.organizationId, organizations.id))
         .where(and(eq(activities.id, id), isNull(activities.deletedAt)))
         .limit(1);
 

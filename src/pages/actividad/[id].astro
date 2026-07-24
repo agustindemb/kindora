@@ -30,59 +30,95 @@ if (slugInUrl !== activity.slug) {
 const currentUser = Astro.locals.user;
 
 // Increment views count asynchronously
-activityRepository.incrementViews(activity.id, currentUser?.id);
+try {
+  activityRepository.incrementViews(activity.id, currentUser?.id);
+} catch(e) {}
 
 // Check if user is registered in this activity
 let isRegistered = false;
 let hasAttended = false;
 if (currentUser) {
-  const userInscriptions = await activityRepository.getUserInscriptions(currentUser.id);
-  const currentIns = userInscriptions.find((ins) => ins.activityId === activity.id);
-  if (currentIns) {
-    isRegistered = currentIns.status === 'registered';
-    hasAttended = currentIns.status === 'attended';
-  }
+  try {
+    const userInscriptions = await activityRepository.getUserInscriptions(currentUser.id);
+    const currentIns = (userInscriptions || []).find((ins) => ins && ins.activityId === activity.id);
+    if (currentIns) {
+      isRegistered = currentIns.status === 'registered';
+      hasAttended = currentIns.status === 'attended';
+    }
+  } catch(e) {}
 }
 
 // Check if user has bookmarked this activity
-const isBookmarked = currentUser ? await activityRepository.isBookmarked(currentUser.id, activity.id) : false;
+let isBookmarked = false;
+if (currentUser) {
+  try {
+    isBookmarked = await activityRepository.isBookmarked(currentUser.id, activity.id);
+  } catch(e) {}
+}
 
 // Check if user follows the organization
-const isFollowingOrg = currentUser ? await organizationRepository.isFollowing(currentUser.id, activity.organizationId) : false;
+let isFollowingOrg = false;
+if (currentUser && activity.organizationId) {
+  try {
+    isFollowingOrg = await organizationRepository.isFollowing(currentUser.id, activity.organizationId);
+  } catch(e) {}
+}
 
 // Fetch reviews
-const reviewsList = await reviewRepository.getByActivity(activity.id);
-const averageRating = reviewsList.length > 0
-  ? (reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)
+let reviewsList: any[] = [];
+try {
+  reviewsList = await reviewRepository.getByActivity(activity.id);
+} catch(e) {}
+
+const averageRating = (reviewsList || []).length > 0
+  ? (reviewsList.reduce((acc, r) => acc + (r?.rating || 0), 0) / reviewsList.length).toFixed(1)
   : "0.0";
 
 // Fetch similar activities
-const similarActivities = await activityRepository.list({
-  categoryId: activity.categoryId,
-  limit: 3,
-});
-const filteredSimilar = similarActivities.filter((a) => a.id !== activity.id).slice(0, 3);
+let similarActivities: any[] = [];
+try {
+  if (activity.categoryId) {
+    similarActivities = await activityRepository.list({
+      categoryId: activity.categoryId,
+      limit: 3,
+    });
+  }
+} catch(e) {}
+const filteredSimilar = (similarActivities || []).filter((a) => a && a.id !== activity.id).slice(0, 3);
 
-// Format times
-const startDate = new Date(activity.startsAt);
-const endDate = new Date(activity.endsAt);
-const formattedStartDate = startDate.toLocaleDateString('es-AR', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric'
-});
-const formattedStartTime = startDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
-const formattedEndTime = endDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+// Format times safely
+const startDate = activity.startsAt ? new Date(activity.startsAt) : new Date();
+const endDate = activity.endsAt ? new Date(activity.endsAt) : new Date();
 
-const spotsLeft = Math.max(0, activity.capacity - activity.confirmedRegistrations);
-const isSoldOut = spotsLeft === 0;
+let formattedStartDate = "Fecha a confirmar";
+let formattedStartTime = "00:00";
+let formattedEndTime = "00:00";
+
+try {
+  if (!isNaN(startDate.getTime())) {
+    formattedStartDate = startDate.toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    formattedStartTime = startDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  if (!isNaN(endDate.getTime())) {
+    formattedEndTime = endDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+} catch(e) {}
+
+const capacityNum = Number(activity.capacity) || 0;
+const confirmedNum = Number(activity.confirmedRegistrations) || 0;
+const spotsLeft = capacityNum > 0 ? Math.max(0, capacityNum - confirmedNum) : 999;
+const isSoldOut = capacityNum > 0 && spotsLeft === 0;
 
 // Images gallery
-const coverImage = activity.images?.find((img) => img.isCover)?.url 
+const coverImage = activity.images?.find((img) => img?.isCover)?.url 
   || activity.images?.[0]?.url 
   || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800";
-const secondaryImages = activity.images?.filter((img) => !img.isCover) || [];
+const secondaryImages = activity.images?.filter((img) => img && !img.isCover) || [];
 
 // Safe date objects
 const startsAtDate = new Date(activity.startsAt);
