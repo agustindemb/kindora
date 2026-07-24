@@ -41,7 +41,7 @@ try {
   } catch (e) {}
 
   // 1. Fetch counts
-  const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user);
+  const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user).where(isNull(user.deletedAt));
   const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
   const actsRes = await db
     .select({ count: sql`count(${schema.activities.id})::int` })
@@ -59,6 +59,7 @@ try {
   allUsersList = await db
     .select()
     .from(user)
+    .where(isNull(user.deletedAt))
     .orderBy(desc(user.createdAt));
 
   allOrgsList = await db
@@ -254,14 +255,11 @@ if (Astro.request.method === 'POST') {
       if (targetUserId === currentUser.id) {
         throw new Error('No podés eliminar tu propia cuenta de administrador.');
       }
-      await db.update(user).set({
-        deletedAt: new Date(),
-        updatedAt: new Date()
-      }).where(eq(user.id, targetUserId));
+      const { userRepository } = await import('../../lib/repositories/userRepository');
+      await userRepository.hardDelete(targetUserId);
 
       successMsg = 'Usuario eliminado correctamente.';
       return Astro.redirect('/admin?tab=users');
-
     } else if (action === 'delete_organization') {
       const orgId = formData.get('organizationId') as string;
       const { organizationRepository } = await import('../../lib/repositories/organizationRepository');
