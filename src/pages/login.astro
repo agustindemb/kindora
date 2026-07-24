@@ -212,6 +212,12 @@ if (Astro.request.method === 'POST') {
           )}
         </div>
 
+        {Astro.url.searchParams.get('deleted') === 'true' && (
+          <div class="rounded-xl bg-zinc-100 border border-zinc-200 p-4 text-sm text-zinc-700 font-medium">
+            🗑️ Tu cuenta ha sido eliminada correctamente. Gracias por haber sido parte de Kindora.
+          </div>
+        )}
+
         {errorMessage && (
           <div class="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm text-rose-700 font-medium">
             ⚠️ {errorMessage}
