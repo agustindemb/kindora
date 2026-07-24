@@ -76,7 +76,7 @@ try {
     .from(organizations)
     .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
 
-  // 4. Fetch logs of verification requests
+  // 4. Fetch logs of verification requests (only for orgs that are still unverified)
   const logs = await db
     .select({
       log: organizationLogs,
@@ -86,7 +86,13 @@ try {
     .from(organizationLogs)
     .innerJoin(organizations, eq(organizationLogs.organizationId, organizations.id))
     .innerJoin(user, eq(organizationLogs.userId, user.id))
-    .where(eq(organizationLogs.action, 'verification_requested'))
+    .where(
+      and(
+        eq(organizationLogs.action, 'verification_requested'),
+        eq(organizations.verificationLevel, 'none'),
+        isNull(organizations.deletedAt)
+      )
+    )
     .orderBy(desc(organizationLogs.createdAt));
 
   pendingVerificationsList = logs.map(l => {
@@ -166,6 +172,14 @@ if (Astro.request.method === 'POST') {
       await db.update(schema.activities).set({
         status: 'published'
       }).where(and(eq(schema.activities.organizationId, orgId), eq(schema.activities.status, 'pending_review')));
+
+      // Clean up pending verification_requested logs for this org
+      await db.delete(organizationLogs).where(
+        and(
+          eq(organizationLogs.organizationId, orgId),
+          eq(organizationLogs.action, 'verification_requested')
+        )
+      );
 
       await db.insert(schema.organizationLogs).values({
         organizationId: orgId,
