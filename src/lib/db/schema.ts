@@ -171,6 +171,10 @@ export const activities = pgTable("activities", {
   externalUrl: text("externalUrl"),
   visibility: text("visibility").default("public").notNull(), // public, unlisted, private
   needsVolunteers: boolean("needsVolunteers").default(true).notNull(), // true = accepts volunteers, false = does not need volunteers
+  isRecurring: boolean("isRecurring").default(false).notNull(),
+  recurrenceRule: text("recurrenceRule"), // 'weekly', 'biweekly', 'monthly'
+  recurrenceDays: text("recurrenceDays"), // JSON array string e.g. ["lun", "mié"]
+  recurrenceEnd: timestamp("recurrenceEnd"),
   contactName: text("contactName"),
   contactEmail: text("contactEmail"),
   contactPhone: text("contactPhone"),

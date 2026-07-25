@@ -65,6 +65,14 @@ if (Astro.request.method === 'POST') {
     const visibility = formData.get('visibility') as string;
     const needsVolunteers = formData.get('needsVolunteers') === 'on' || formData.get('needsVolunteers') === 'true';
     
+    // Recurrence details
+    const isRecurring = formData.get('isRecurring') === 'true' || formData.get('isRecurring') === 'on';
+    const recurrenceRule = formData.get('recurrenceRule') as string || null;
+    const recurrenceEndVal = formData.get('recurrenceEnd') as string;
+    const recurrenceEnd = recurrenceEndVal ? new Date(recurrenceEndVal) : null;
+    const recurrenceDaysArr = formData.getAll('recurrenceDays') as string[];
+    const recurrenceDays = recurrenceDaysArr.length > 0 ? JSON.stringify(recurrenceDaysArr) : null;
+    
     const contactName = formData.get('contactName') as string || null;
     const contactEmail = formData.get('contactEmail') as string || null;
     const contactPhone = formData.get('contactPhone') as string || null;
@@ -106,6 +114,10 @@ if (Astro.request.method === 'POST') {
           externalUrl,
           visibility,
           needsVolunteers,
+          isRecurring,
+          recurrenceRule: isRecurring ? recurrenceRule : null,
+          recurrenceDays: isRecurring ? recurrenceDays : null,
+          recurrenceEnd: isRecurring ? recurrenceEnd : null,
           contactName,
           contactEmail,
           contactPhone,
@@ -141,6 +153,10 @@ if (Astro.request.method === 'POST') {
           externalUrl,
           visibility,
           needsVolunteers,
+          isRecurring,
+          recurrenceRule: isRecurring ? recurrenceRule : null,
+          recurrenceDays: isRecurring ? recurrenceDays : null,
+          recurrenceEnd: isRecurring ? recurrenceEnd : null,
           contactName,
           contactEmail,
           contactPhone,
@@ -378,6 +394,81 @@ if (Astro.request.method === 'POST') {
           <div>
             <label for="act-price" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Costo (ARS)</label>
             <input type="number" id="act-price" name="price" value={activityToEdit?.price || '0.00'} placeholder="0.00 para gratis" min="0" step="0.01" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+          </div>
+        </div>
+
+        <!-- Recurrence Section -->
+        <div class="mt-6 pt-6 border-t border-zinc-100 space-y-4">
+          <label class="flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 bg-zinc-50/50 hover:bg-emerald-50/20 hover:border-emerald-200 cursor-pointer transition-all">
+            <input 
+              type="checkbox" 
+              id="is-recurring-check" 
+              name="isRecurring" 
+              value="true"
+              checked={activityToEdit?.isRecurring}
+              class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-5 w-5" 
+            />
+            <div>
+              <span class="block text-sm font-bold text-zinc-900">🔄 ¿Esta actividad es recurrente?</span>
+              <span class="block text-xs text-zinc-500 font-medium">Marcá esta opción si se repite periódicamente (ej: todos los miércoles o todos los lunes y martes).</span>
+            </div>
+          </label>
+
+          <div id="recurrence-options" class={`space-y-4 p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100 ${activityToEdit?.isRecurring ? '' : 'hidden'}`}>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="act-rec-rule" class="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Frecuencia</label>
+                <select id="act-rec-rule" name="recurrenceRule" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-semibold">
+                  <option value="weekly" selected={activityToEdit?.recurrenceRule === 'weekly'}>Semanal</option>
+                  <option value="biweekly" selected={activityToEdit?.recurrenceRule === 'biweekly'}>Quincenal</option>
+                  <option value="monthly" selected={activityToEdit?.recurrenceRule === 'monthly'}>Mensual</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="act-rec-end" class="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Fecha fin de la recurrencia (opcional)</label>
+                <input 
+                  type="date" 
+                  id="act-rec-end" 
+                  name="recurrenceEnd" 
+                  value={activityToEdit?.recurrenceEnd ? new Date(activityToEdit.recurrenceEnd).toISOString().slice(0, 10) : ''}
+                  class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2.5">Días de la semana en que se realiza</label>
+              <div class="flex flex-wrap gap-2">
+                {[
+                  { id: 'lun', label: 'Lunes' },
+                  { id: 'mar', label: 'Martes' },
+                  { id: 'mié', label: 'Miércoles' },
+                  { id: 'jue', label: 'Jueves' },
+                  { id: 'vie', label: 'Viernes' },
+                  { id: 'sáb', label: 'Sábado' },
+                  { id: 'dom', label: 'Domingo' }
+                ].map(d => {
+                  let isChecked = false;
+                  try {
+                    const daysArr = JSON.parse(activityToEdit?.recurrenceDays || '[]');
+                    isChecked = Array.isArray(daysArr) && daysArr.includes(d.id);
+                  } catch(e){}
+                  return (
+                    <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-zinc-200 bg-white hover:border-emerald-300 cursor-pointer text-xs font-bold text-zinc-700 transition-all">
+                      <input 
+                        type="checkbox" 
+                        name="recurrenceDays" 
+                        value={d.id} 
+                        checked={isChecked}
+                        class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4" 
+                      />
+                      <span>{d.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -719,6 +810,19 @@ if (Astro.request.method === 'POST') {
   if (registrationTypeSelect) {
     registrationTypeSelect.addEventListener('change', checkRegType);
     checkRegType();
+  }
+
+  // Recurrence toggle listener
+  const recCheck = document.getElementById('is-recurring-check') as HTMLInputElement | null;
+  const recContainer = document.getElementById('recurrence-options');
+  if (recCheck && recContainer) {
+    recCheck.addEventListener('change', () => {
+      if (recCheck.checked) {
+        recContainer.classList.remove('hidden');
+      } else {
+        recContainer.classList.add('hidden');
+      }
+    });
   }
 
   // Multi-step transitions

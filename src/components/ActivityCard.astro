@@ -66,14 +66,19 @@ const isOrgVerified = activity.organization?.verificationLevel !== 'none';
       </button>
     </div>
 
-    <!-- Bottom Pricing Tag -->
-    {isFree && (
-      <div class="absolute bottom-3 left-3">
+    <!-- Bottom Pricing Tag & Recurrence Badge -->
+    <div class="absolute bottom-3 left-3 flex items-center gap-1.5">
+      {isFree && (
         <span class="inline-flex items-center rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
           Gratis
         </span>
-      </div>
-    )}
+      )}
+      {activity.isRecurring && (
+        <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-900/90 text-white px-2 py-1 text-[11px] font-bold shadow-sm backdrop-blur-sm">
+          🔄 Recurrente
+        </span>
+      )}
+    </div>
   </a>
 
   <!-- Content Container -->

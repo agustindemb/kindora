@@ -40,6 +40,10 @@ export async function ensureSchemaColumns() {
     try {
       await client.query(`
         ALTER TABLE activities ADD COLUMN IF NOT EXISTS "needsVolunteers" boolean DEFAULT true NOT NULL;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "isRecurring" boolean DEFAULT false NOT NULL;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "recurrenceRule" text;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "recurrenceDays" text;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "recurrenceEnd" timestamp;
         ALTER TABLE activities ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
         ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
         ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "volunteerMode" text DEFAULT 'immediate' NOT NULL;

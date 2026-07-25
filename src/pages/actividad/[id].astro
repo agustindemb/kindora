@@ -284,6 +284,39 @@ const jsonLd = {
           </div>
         </div>
 
+        <!-- Recurrence Banner if active -->
+        {activity.isRecurring && (
+          <div class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-emerald-950 shadow-sm">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm flex-shrink-0 font-bold">
+              🔄
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-emerald-900">
+                Actividad Recurrente ({activity.recurrenceRule === 'biweekly' ? 'Quincenal' : activity.recurrenceRule === 'monthly' ? 'Mensual' : 'Semanal'})
+              </h3>
+              <p class="text-xs text-emerald-800 font-semibold mt-0.5">
+                {(() => {
+                  let daysStr = "";
+                  try {
+                    const daysArr = JSON.parse(activity.recurrenceDays || "[]");
+                    if (Array.isArray(daysArr) && daysArr.length > 0) {
+                      const dayNameMap: Record<string, string> = {
+                        lun: "Lunes", mar: "Martes", mié: "Miércoles", jue: "Jueves", vie: "Viernes", sáb: "Sábado", dom: "Domingo"
+                      };
+                      daysStr = daysArr.map(d => dayNameMap[d] || d).join(", ");
+                    }
+                  } catch(e){}
+                  return daysStr ? `Todos los ${daysStr}` : 'Se realiza de forma periódica';
+                })()}
+                {activity.recurrenceEnd ? ` hasta el ${new Date(activity.recurrenceEnd).toLocaleDateString('es-AR')}` : ''}
+              </p>
+              <p class="text-[11px] text-emerald-700 font-medium mt-1">
+                Podés inscribirte y sumarte a cualquiera de los días u horarios programados.
+              </p>
+            </div>
+          </div>
+        )}
+
         <!-- Description -->
         <div class="space-y-4">
           <h2 class="text-xl font-bold text-zinc-950">Sobre esta actividad</h2>
