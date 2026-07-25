@@ -73,9 +73,17 @@ if (Astro.request.method === 'POST') {
     const recurrenceDaysArr = formData.getAll('recurrenceDays') as string[];
     const recurrenceDays = recurrenceDaysArr.length > 0 ? JSON.stringify(recurrenceDaysArr) : null;
     
-    const contactName = formData.get('contactName') as string || null;
-    const contactEmail = formData.get('contactEmail') as string || null;
-    const contactPhone = formData.get('contactPhone') as string || null;
+    let contactName = (formData.get('contactName') as string || '').trim() || null;
+    let contactEmail = (formData.get('contactEmail') as string || '').trim();
+    let contactPhone = (formData.get('contactPhone') as string || '').trim();
+
+    // Auto-complete missing contact details with organization's default email and phone if left blank
+    if (!contactEmail && org?.email) {
+      contactEmail = org.email;
+    }
+    if (!contactPhone && (org?.whatsapp || org?.phone)) {
+      contactPhone = org.whatsapp || org.phone || '';
+    }
     
     // Location details
     const address = formData.get('address') as string;
@@ -242,12 +250,16 @@ if (Astro.request.method === 'POST') {
         <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Información Básica</h3>
         
         <div>
-          <label for="act-title" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Título de la actividad</label>
+          <label for="act-title" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            Título de la actividad <span class="text-rose-500 font-bold ml-0.5">*</span>
+          </label>
           <input type="text" id="act-title" name="title" value={activityToEdit?.title || ''} placeholder="ej: Picnic inclusivo de integración" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
         </div>
 
         <div>
-          <label for="act-cat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Categoría principal</label>
+          <label for="act-cat" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            Categoría principal <span class="text-rose-500 font-bold ml-0.5">*</span>
+          </label>
           <select id="act-cat" name="categoryId" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
             {categoriesList.map((cat) => (
               <option value={cat.id} selected={activityToEdit?.categoryId === cat.id}>{cat.name}</option>
@@ -256,7 +268,9 @@ if (Astro.request.method === 'POST') {
         </div>
 
         <div>
-          <label for="act-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descripción detallada</label>
+          <label for="act-desc" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            Descripción detallada <span class="text-rose-500 font-bold ml-0.5">*</span>
+          </label>
           <textarea id="act-desc" name="description" rows="5" placeholder="Describí en detalle en qué consiste la actividad, qué harán, qué deben llevar, etc." class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>{activityToEdit?.description || ''}</textarea>
         </div>
 
@@ -363,7 +377,9 @@ if (Astro.request.method === 'POST') {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="act-starts" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Fecha y hora de Inicio</label>
+            <label for="act-starts" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Fecha y hora de Inicio <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <input 
               type="datetime-local" 
               id="act-starts" 
@@ -375,7 +391,9 @@ if (Astro.request.method === 'POST') {
           </div>
 
           <div>
-            <label for="act-ends" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Fecha y hora de Finalización</label>
+            <label for="act-ends" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Fecha y hora de Finalización <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <input 
               type="datetime-local" 
               id="act-ends" 
@@ -387,12 +405,16 @@ if (Astro.request.method === 'POST') {
           </div>
 
           <div>
-            <label for="act-capacity" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Capacidad máxima (cupos)</label>
+            <label for="act-capacity" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Capacidad máxima (cupos) <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <input type="number" id="act-capacity" name="capacity" value={activityToEdit?.capacity || ''} placeholder="ej: 25" min="1" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
           </div>
 
           <div>
-            <label for="act-price" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Costo (ARS)</label>
+            <label for="act-price" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Costo (ARS) <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <input type="number" id="act-price" name="price" value={activityToEdit?.price || '0.00'} placeholder="0.00 para gratis" min="0" step="0.01" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
           </div>
         </div>
@@ -480,17 +502,23 @@ if (Astro.request.method === 'POST') {
         <div class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
-              <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Dirección (Calle y altura)</label>
+              <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                Dirección (Calle y altura) <span class="text-rose-500 font-bold ml-0.5">*</span>
+              </label>
               <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
             </div>
 
             <div>
-              <label for="act-city" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Ciudad / Barrio</label>
+              <label for="act-city" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                Ciudad / Barrio <span class="text-rose-500 font-bold ml-0.5">*</span>
+              </label>
               <input type="text" id="act-city" name="city" value={activityToEdit?.location?.city || ''} placeholder="ej: Tigre o Palermo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
             </div>
 
             <div>
-              <label for="act-prov" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Provincia</label>
+              <label for="act-prov" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                Provincia <span class="text-rose-500 font-bold ml-0.5">*</span>
+              </label>
               <input type="text" id="act-prov" name="province" value={activityToEdit?.location?.province || ''} placeholder="ej: Buenos Aires" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
             </div>
           </div>
@@ -556,13 +584,29 @@ if (Astro.request.method === 'POST') {
             </div>
 
             <div>
-              <label for="act-contact-email" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Correo</label>
-              <input type="email" id="act-contact-email" name="contactEmail" value={activityToEdit?.contactEmail || ''} placeholder="correo@ejemplo.com" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+              <label for="act-contact-email" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Correo de contacto</label>
+              <input 
+                type="email" 
+                id="act-contact-email" 
+                name="contactEmail" 
+                value={activityToEdit ? activityToEdit.contactEmail : (org?.email || '')} 
+                placeholder={org?.email || "correo@ejemplo.com"} 
+                class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+              />
+              <span class="block text-[10px] text-zinc-400 font-normal mt-1">Si se deja vacío, se utilizará el correo de la organización.</span>
             </div>
 
             <div>
-              <label for="act-contact-phone" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Teléfono</label>
-              <input type="tel" id="act-contact-phone" name="contactPhone" value={activityToEdit?.contactPhone || ''} placeholder="+54 9 11 5555 5555" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
+              <label for="act-contact-phone" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Teléfono / WhatsApp</label>
+              <input 
+                type="tel" 
+                id="act-contact-phone" 
+                name="contactPhone" 
+                value={activityToEdit ? activityToEdit.contactPhone : (org?.whatsapp || org?.phone || '')} 
+                placeholder={org?.whatsapp || org?.phone || "+54 9 11 5555 5555"} 
+                class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+              />
+              <span class="block text-[10px] text-zinc-400 font-normal mt-1">Si se deja vacío, se utilizará el teléfono de la organización.</span>
             </div>
           </div>
         </div>
@@ -574,7 +618,9 @@ if (Astro.request.method === 'POST') {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="act-reg-type" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Método de Inscripción</label>
+            <label for="act-reg-type" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Método de Inscripción <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <select id="act-reg-type" name="registrationType" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
               <option value="open" selected={activityToEdit?.registrationType === 'open'}>Abierta (Inscripción directa en Kindora)</option>
               <option value="approval_required" selected={activityToEdit?.registrationType === 'approval_required'}>Requiere aprobación (Revisión manual)</option>
@@ -600,7 +646,9 @@ if (Astro.request.method === 'POST') {
           </div>
 
           <div>
-            <label for="act-vis" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Visibilidad de la actividad</label>
+            <label for="act-vis" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Visibilidad de la actividad <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
             <select id="act-vis" name="visibility" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
               <option value="public" selected={activityToEdit?.visibility === 'public'}>Pública (Visible en listas y buscadores)</option>
               <option value="unlisted" selected={activityToEdit?.visibility === 'unlisted'}>Oculta (Solo acceso mediante link)</option>
@@ -646,7 +694,7 @@ if (Astro.request.method === 'POST') {
           <button 
             type="submit" 
             id="btn-submit" 
-            class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] cursor-pointer"
+            class="hidden items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.98] cursor-pointer"
           >
             {activityToEdit ? '💾 Guardar Cambios' : 'Publicar Actividad'}
           </button>
@@ -826,6 +874,64 @@ if (Astro.request.method === 'POST') {
     });
   }
 
+  // Validation logic
+  function validateFields(stepNum?: number): { isValid: boolean; invalidField: HTMLElement | null; invalidStep: number } {
+    document.querySelectorAll('.is-invalid-field').forEach((el) => {
+      el.classList.remove('is-invalid-field', 'border-rose-500', 'ring-2', 'ring-rose-200', 'bg-rose-50/30');
+    });
+
+    const stepsToValidate = stepNum ? [stepNum] : [1, 2, 3, 4, 5];
+
+    for (const s of stepsToValidate) {
+      const section = document.getElementById(`step-section-${s}`);
+      if (!section) continue;
+
+      const requiredInputs = section.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[required]');
+      for (const input of Array.from(requiredInputs)) {
+        let isFieldValid = true;
+
+        if (input.type === 'hidden' && input.id === 'cover-image-final') {
+          isFieldValid = !!input.value.trim();
+        } else {
+          isFieldValid = input.checkValidity() && !!input.value.trim();
+        }
+
+        if (!isFieldValid) {
+          return { isValid: false, invalidField: input, invalidStep: s };
+        }
+      }
+    }
+
+    return { isValid: true, invalidField: null, invalidStep: 0 };
+  }
+
+  function highlightInvalidField(field: HTMLElement, step: number) {
+    updateStep(step);
+
+    field.classList.add('is-invalid-field', 'border-rose-500', 'ring-2', 'ring-rose-200', 'bg-rose-50/30');
+    field.focus();
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    let errBanner = document.getElementById('wizard-validation-error');
+    if (!errBanner) {
+      errBanner = document.createElement('div');
+      errBanner.id = 'wizard-validation-error';
+      errBanner.className = 'rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-700 font-bold mb-4 flex items-center gap-2 shadow-sm';
+      form.prepend(errBanner);
+    }
+    errBanner.innerHTML = '⚠️ Por favor completá el campo obligatorio (*) marcado en rojo.';
+    errBanner.classList.remove('hidden');
+
+    const clearErr = () => {
+      field.classList.remove('is-invalid-field', 'border-rose-500', 'ring-2', 'ring-rose-200', 'bg-rose-50/30');
+      if (errBanner) errBanner.classList.add('hidden');
+      field.removeEventListener('input', clearErr);
+      field.removeEventListener('change', clearErr);
+    };
+    field.addEventListener('input', clearErr);
+    field.addEventListener('change', clearErr);
+  }
+
   // Multi-step transitions
   function updateStep(step: number) {
     currentStep = step;
@@ -856,8 +962,8 @@ if (Astro.request.method === 'POST') {
       }
     }
 
-    // Toggle nav buttons
-    if (btnPrev && btnNext) {
+    // Toggle nav buttons: Submit button ONLY shows on the last step (step 5)
+    if (btnPrev && btnNext && btnSubmit) {
       if (step === 1) {
         btnPrev.classList.remove('inline-flex');
         btnPrev.classList.add('hidden');
@@ -869,9 +975,15 @@ if (Astro.request.method === 'POST') {
       if (step === maxSteps) {
         btnNext.classList.remove('inline-flex');
         btnNext.classList.add('hidden');
+
+        btnSubmit.classList.remove('hidden');
+        btnSubmit.classList.add('inline-flex');
       } else {
         btnNext.classList.remove('hidden');
         btnNext.classList.add('inline-flex');
+
+        btnSubmit.classList.remove('inline-flex');
+        btnSubmit.classList.add('hidden');
       }
     }
   }
@@ -880,6 +992,13 @@ if (Astro.request.method === 'POST') {
   document.querySelectorAll('[data-step-nav]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const targetStep = parseInt(btn.getAttribute('data-step-nav') || '1', 10);
+      if (targetStep > currentStep) {
+        const validation = validateFields(currentStep);
+        if (!validation.isValid && validation.invalidField) {
+          highlightInvalidField(validation.invalidField, validation.invalidStep);
+          return;
+        }
+      }
       updateStep(targetStep);
     });
   });
@@ -887,6 +1006,11 @@ if (Astro.request.method === 'POST') {
   // Click listeners for Siguiente / Anterior
   if (btnNext) {
     btnNext.addEventListener('click', () => {
+      const validation = validateFields(currentStep);
+      if (!validation.isValid && validation.invalidField) {
+        highlightInvalidField(validation.invalidField, validation.invalidStep);
+        return;
+      }
       if (currentStep < maxSteps) {
         updateStep(currentStep + 1);
       }
@@ -897,6 +1021,17 @@ if (Astro.request.method === 'POST') {
     btnPrev.addEventListener('click', () => {
       if (currentStep > 1) {
         updateStep(currentStep - 1);
+      }
+    });
+  }
+
+  // Validate all fields before submitting form
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      const validation = validateFields();
+      if (!validation.isValid && validation.invalidField) {
+        e.preventDefault();
+        highlightInvalidField(validation.invalidField, validation.invalidStep);
       }
     });
   }
