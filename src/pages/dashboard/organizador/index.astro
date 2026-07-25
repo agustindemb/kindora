@@ -24,29 +24,34 @@ let pendingInscriptionsList: any[] = [];
 let orgStats: any = null;
 
 if (org) {
-  // Fetch activities
-  orgActivitiesList = await activityRepository.list({
+  // Fetch all activities for this organization
+  const rawActivities = await activityRepository.list({
     organizationId: org.id,
-    status: 'published', // we fetch published
   });
   
-  // also fetch drafts
-  try {
-    const drafts = await activityRepository.list({
-      organizationId: org.id,
-      status: 'draft',
-    });
-    orgActivitiesList = [...drafts, ...orgActivitiesList];
-  } catch(e) {}
+  // Deduplicate activities by id
+  const actMap = new Map();
+  for (const act of rawActivities) {
+    if (!actMap.has(act.id)) {
+      actMap.set(act.id, act);
+    }
+  }
+  orgActivitiesList = Array.from(actMap.values());
 
   // Fetch stats
   orgStats = await organizationRepository.getStats(org.id);
 
-  // Fetch inscriptions for all org activities to show in attendees management
+  // Fetch inscriptions for all org activities to show in attendees management (deduplicated by inscription ID)
+  const insMap = new Map();
   for (const act of orgActivitiesList) {
     const ins = await activityRepository.getInscriptions(act.id);
-    pendingInscriptionsList.push(...ins.map(i => ({ ...i, activityTitle: act.title })));
+    for (const i of ins) {
+      if (!insMap.has(i.id)) {
+        insMap.set(i.id, { ...i, activityTitle: act.title });
+      }
+    }
   }
+  pendingInscriptionsList = Array.from(insMap.values());
 }
 
 // Handle POST actions: Organization Registration or Updates

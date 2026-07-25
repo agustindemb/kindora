@@ -574,11 +574,13 @@ export const activityRepository = {
         .offset(filters.offset || 0);
 
       if (matchIds.length === 0) {
-        // Fallback: if no strict match, fetch any non-deleted activities
-        const allActive = await db.select({ id: activities.id }).from(activities).where(isNull(activities.deletedAt)).limit(filters.limit || 50);
-        if (allActive.length > 0) {
-          const listDetails = await Promise.all(allActive.map((m) => this.findById(m.id)));
-          return listDetails.filter((r) => r !== null) as ActivityWithDetails[];
+        // Fallback ONLY for general searches when no specific filters were requested
+        if (!filters.status && !filters.organizationId && !filters.categoryId && !filters.city) {
+          const allActive = await db.select({ id: activities.id }).from(activities).where(isNull(activities.deletedAt)).limit(filters.limit || 50);
+          if (allActive.length > 0) {
+            const listDetails = await Promise.all(allActive.map((m) => this.findById(m.id)));
+            return listDetails.filter((r) => r !== null) as ActivityWithDetails[];
+          }
         }
         return [];
       }
