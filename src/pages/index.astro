@@ -172,27 +172,80 @@ const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
   </section>
 
   <!-- Categories Grid -->
-  <section class="py-16 sm:py-24 bg-white">
+  <section class="py-12 sm:py-24 bg-white">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl mb-8">
-        Explorá por categorías
-      </h2>
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {categoriesList.map((cat) => {
+      <div class="flex items-center justify-between mb-6 sm:mb-8">
+        <h2 class="text-2xl font-extrabold tracking-tight text-zinc-950 sm:text-3xl">
+          Explorá por categorías
+        </h2>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" id="categories-grid">
+        {categoriesList.map((cat, index) => {
           const emoji = cat.slug === 'autismo' ? '🧩' : cat.slug === 'discapacidad' ? '♿' : cat.slug === 'infancias' ? '👶' : cat.slug === 'adultos-mayores' ? '👴' : cat.slug === 'voluntariado' ? '🤝' : cat.slug === 'medio-ambiente' ? '🌱' : cat.slug === 'salud-mental' ? '🧠' : cat.slug === 'educacion' ? '📚' : cat.slug === 'arte-y-cultura' ? '🎨' : cat.slug === 'deportes' ? '⚽' : cat.slug === 'rescate-animal' ? '🐶' : '🏡';
+          const isHiddenOnMobile = index >= 4;
           return (
             <a 
               href={`/explorar?category=${cat.id}`} 
-              class="flex flex-col items-center justify-center p-6 rounded-2xl border border-zinc-100 bg-zinc-50/50 hover:bg-white hover:border-emerald-200 hover:shadow-sm hover:shadow-emerald-50 hover:-translate-y-0.5 transition-all duration-300 text-center group"
+              class={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border border-zinc-100 bg-zinc-50/50 hover:bg-white hover:border-emerald-200 hover:shadow-sm hover:shadow-emerald-50 hover:-translate-y-0.5 transition-all duration-300 text-center group ${isHiddenOnMobile ? 'hidden sm:flex category-extra-item' : 'flex'}`}
             >
-              <span class="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300">{emoji}</span>
-              <span class="text-sm font-semibold text-zinc-900 leading-snug group-hover:text-emerald-700 transition-colors">{cat.name}</span>
+              <span class="text-2xl sm:text-3xl mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-300">{emoji}</span>
+              <span class="text-xs sm:text-sm font-semibold text-zinc-900 leading-snug group-hover:text-emerald-700 transition-colors">{cat.name}</span>
             </a>
           );
         })}
       </div>
+
+      <!-- Show More Button (Mobile only) -->
+      {categoriesList.length > 4 && (
+        <div class="mt-4 sm:hidden text-center">
+          <button 
+            type="button" 
+            id="toggle-categories-btn"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 px-4 py-2.5 text-xs font-bold text-zinc-700 transition-all cursor-pointer shadow-sm"
+          >
+            <span id="toggle-cat-text">Ver todas las categorías ({categoriesList.length})</span>
+            <span id="toggle-cat-icon">↓</span>
+          </button>
+        </div>
+      )}
     </div>
   </section>
+
+  <script>
+    const toggleCatBtn = document.getElementById('toggle-categories-btn');
+    const toggleCatText = document.getElementById('toggle-cat-text');
+    const toggleCatIcon = document.getElementById('toggle-cat-icon');
+    let isExpanded = false;
+
+    if (toggleCatBtn) {
+      toggleCatBtn.addEventListener('click', () => {
+        const extraItems = document.querySelectorAll('.category-extra-item');
+        isExpanded = !isExpanded;
+
+        extraItems.forEach((item) => {
+          if (isExpanded) {
+            item.classList.remove('hidden');
+            item.classList.add('flex');
+          } else {
+            item.classList.remove('flex');
+            item.classList.add('hidden');
+          }
+        });
+
+        if (toggleCatText && toggleCatIcon) {
+          if (isExpanded) {
+            toggleCatText.textContent = 'Ver menos categorías';
+            toggleCatIcon.textContent = '↑';
+          } else {
+            const totalCount = document.querySelectorAll('#categories-grid > a').length;
+            toggleCatText.textContent = `Ver todas las categorías (${totalCount})`;
+            toggleCatIcon.textContent = '↓';
+          }
+        }
+      });
+    }
+  </script>
 
   <!-- Featured Sections -->
   <section class="py-16 bg-zinc-50/50 border-y border-zinc-100">
