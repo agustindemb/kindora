@@ -153,7 +153,14 @@ try {
     } catch (e2) {}
   }
 
-  // 3. Fetch unverified organizations
+  // 3. Sync metric card counts with exact list lengths
+  stats = {
+    usersCount: allUsersList.length,
+    orgsCount: allOrgsList.length,
+    actsCount: allActivitiesList.length,
+  };
+
+  // 4. Fetch unverified organizations
   try {
     unverifiedOrgs = await db
       .select()

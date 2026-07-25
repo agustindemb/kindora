@@ -29,3 +29,32 @@ export const pool = new pg.Pool(poolConfig);
 
 // Initialize Drizzle client
 export const db = drizzle(pool, { schema });
+
+// Auto-run schema migrations to add missing columns in PostgreSQL if needed
+let migrationRan = false;
+export async function ensureSchemaColumns() {
+  if (migrationRan) return;
+  migrationRan = true;
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "needsVolunteers" boolean DEFAULT true NOT NULL;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
+        ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
+        ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "volunteerMode" text DEFAULT 'immediate' NOT NULL;
+        ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "volunteerFormSchema" text;
+        ALTER TABLE inscriptions ADD COLUMN IF NOT EXISTS "volunteerAnswers" text;
+        ALTER TABLE inscriptions ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'registered' NOT NULL;
+        ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
+      `);
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.warn("[DB Auto Migration Warning]", e);
+  }
+}
+
+// Trigger migration check non-blockingly
+ensureSchemaColumns().catch(() => {});
