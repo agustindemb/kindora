@@ -5,7 +5,7 @@ import { analyticsService } from '../../services/analyticsService';
 import { db } from '../../lib/db/client';
 import { organizations, organizationStats, user, organizationLogs } from '../../lib/db/schema';
 import * as schema from '../../lib/db/schema';
-import { eq, and, isNull, sql, desc, inArray } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, sql, desc, inArray } from 'drizzle-orm';
 import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText, ExternalLink, Trash2, ArrowUpRight, Search, Shield, UserCheck, Eye, BarChart3, TrendingUp, Activity } from 'lucide-astro';
 
 const currentUser = Astro.locals.user;
@@ -50,7 +50,7 @@ try {
     const deletedOrgs = await db
       .select({ id: organizations.id })
       .from(organizations)
-      .where(sql`${organizations.deletedAt} IS NOT NULL`);
+      .where(isNotNull(organizations.deletedAt));
     
     if (deletedOrgs.length > 0) {
       const deletedOrgIds = deletedOrgs.map(o => o.id);
@@ -60,60 +60,110 @@ try {
     }
   } catch (e) {}
 
-  // 1. Fetch counts
-  const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user).where(isNull(user.deletedAt));
-  const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
-  const actsRes = await db
-    .select({ count: sql`count(${schema.activities.id})::int` })
-    .from(schema.activities)
-    .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
-    .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)));
-  
-  stats = {
-    usersCount: usersRes[0]?.count || 0,
-    orgsCount: orgsRes[0]?.count || 0,
-    actsCount: actsRes[0]?.count || 0,
-  };
+  // 1. Fetch counts safely
+  try {
+    const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user).where(isNull(user.deletedAt));
+    stats.usersCount = usersRes[0]?.count || 0;
+  } catch (e) {
+    try {
+      const usersRes = await db.select({ count: sql`count(${user.id})::int` }).from(user);
+      stats.usersCount = usersRes[0]?.count || 0;
+    } catch (e2) {}
+  }
 
-  // 2. Fetch full lists for inspection
-  allUsersList = await db
-    .select()
-    .from(user)
-    .where(isNull(user.deletedAt))
-    .orderBy(desc(user.createdAt));
+  try {
+    const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations).where(isNull(organizations.deletedAt));
+    stats.orgsCount = orgsRes[0]?.count || 0;
+  } catch (e) {
+    try {
+      const orgsRes = await db.select({ count: sql`count(${organizations.id})::int` }).from(organizations);
+      stats.orgsCount = orgsRes[0]?.count || 0;
+    } catch (e2) {}
+  }
 
-  allOrgsList = await db
-    .select()
-    .from(organizations)
-    .where(isNull(organizations.deletedAt))
-    .orderBy(desc(organizations.createdAt));
+  try {
+    const actsRes = await db
+      .select({ count: sql`count(${schema.activities.id})::int` })
+      .from(schema.activities)
+      .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+      .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)));
+    stats.actsCount = actsRes[0]?.count || 0;
+  } catch (e) {
+    try {
+      const actsRes = await db.select({ count: sql`count(${schema.activities.id})::int` }).from(schema.activities);
+      stats.actsCount = actsRes[0]?.count || 0;
+    } catch (e2) {}
+  }
 
-  allActivitiesList = await db
-    .select({
-      id: schema.activities.id,
-      title: schema.activities.title,
-      slug: schema.activities.slug,
-      status: schema.activities.status,
-      startsAt: schema.activities.startsAt,
-      createdAt: schema.activities.createdAt,
-      price: schema.activities.price,
-      orgName: organizations.name,
-      orgSlug: organizations.slug,
-      categoryName: schema.categories.name,
-    })
-    .from(schema.activities)
-    .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
-    .leftJoin(schema.categories, eq(schema.activities.categoryId, schema.categories.id))
-    .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)))
-    .orderBy(desc(schema.activities.createdAt));
+  // 2. Fetch full lists safely for inspection
+  try {
+    allUsersList = await db.select().from(user).where(isNull(user.deletedAt)).orderBy(desc(user.createdAt));
+  } catch (e) {
+    try {
+      allUsersList = await db.select().from(user).orderBy(desc(user.createdAt));
+    } catch (e2) {}
+  }
+
+  try {
+    allOrgsList = await db.select().from(organizations).where(isNull(organizations.deletedAt)).orderBy(desc(organizations.createdAt));
+  } catch (e) {
+    try {
+      allOrgsList = await db.select().from(organizations).orderBy(desc(organizations.createdAt));
+    } catch (e2) {}
+  }
+
+  try {
+    allActivitiesList = await db
+      .select({
+        id: schema.activities.id,
+        title: schema.activities.title,
+        slug: schema.activities.slug,
+        status: schema.activities.status,
+        startsAt: schema.activities.startsAt,
+        createdAt: schema.activities.createdAt,
+        price: schema.activities.price,
+        orgName: organizations.name,
+        orgSlug: organizations.slug,
+        categoryName: schema.categories.name,
+      })
+      .from(schema.activities)
+      .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+      .leftJoin(schema.categories, eq(schema.activities.categoryId, schema.categories.id))
+      .where(and(isNull(schema.activities.deletedAt), isNull(organizations.deletedAt)))
+      .orderBy(desc(schema.activities.createdAt));
+  } catch (e) {
+    try {
+      allActivitiesList = await db
+        .select({
+          id: schema.activities.id,
+          title: schema.activities.title,
+          slug: schema.activities.slug,
+          status: schema.activities.status,
+          startsAt: schema.activities.startsAt,
+          createdAt: schema.activities.createdAt,
+          price: schema.activities.price,
+          orgName: organizations.name,
+          orgSlug: organizations.slug,
+          categoryName: schema.categories.name,
+        })
+        .from(schema.activities)
+        .innerJoin(organizations, eq(schema.activities.organizationId, organizations.id))
+        .leftJoin(schema.categories, eq(schema.activities.categoryId, schema.categories.id))
+        .orderBy(desc(schema.activities.createdAt));
+    } catch (e2) {}
+  }
 
   // 3. Fetch unverified organizations
-  unverifiedOrgs = await db
-    .select()
-    .from(organizations)
-    .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
+  try {
+    unverifiedOrgs = await db
+      .select()
+      .from(organizations)
+      .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
+  } catch (e) {
+    unverifiedOrgs = allOrgsList.filter((o: any) => o.verificationLevel === 'none');
+  }
 
-  // 4. Fetch logs of verification requests (only for orgs that are still unverified)
+  // 4. Fetch logs of verification requests
   try {
     const logs = await db
       .select({
@@ -151,37 +201,35 @@ try {
   }
 } catch(e) {
   console.warn("DB query error or fallback mock used for admin:", e);
-  const { organizationRepository } = await import('../../lib/repositories/organizationRepository');
-  const { activityRepository } = await import('../../lib/repositories/activityRepository');
-  const { userRepository } = await import('../../lib/repositories/userRepository');
-
-  const activeOrgs = (await organizationRepository.list()) || [];
-  const activeActs = (await activityRepository.list({})) || [];
-  const activeUsers = (await userRepository.list()) || [];
-
-  unverifiedOrgs = activeOrgs.filter((o: any) => o.verificationLevel === 'none');
-  stats = {
-    usersCount: activeUsers.length,
-    orgsCount: activeOrgs.length,
-    actsCount: activeActs.length,
-  };
-  
-  allUsersList = activeUsers;
-  allOrgsList = activeOrgs;
-  allActivitiesList = activeActs.map((a: any) => ({
-    id: a.id,
-    title: a.title,
-    slug: a.slug,
-    status: a.status,
-    startsAt: a.startsAt,
-    createdAt: a.createdAt,
-    price: a.price,
-    orgName: a.organization?.name || 'Organización Kindora',
-    orgSlug: a.organization?.slug || 'org-kindora',
-    categoryName: a.category?.name || 'General'
-  }));
-
-  pendingVerificationsList = [];
+  try {
+    const { mockOrganizations, mockActivities } = await import('../../lib/db/mocks');
+    allOrgsList = mockOrganizations || [];
+    allActivitiesList = (mockActivities || []).map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      slug: a.slug,
+      status: a.status,
+      startsAt: a.startsAt,
+      createdAt: a.createdAt,
+      price: a.price,
+      orgName: 'Organización Kindora',
+      orgSlug: 'org-kindora',
+      categoryName: 'General'
+    }));
+    allUsersList = [
+      { id: 'usr_admin', name: 'Admin Kindora', email: 'agustin@proasc.com', role: 'admin', createdAt: new Date() },
+      { id: 'usr_org', name: 'María Gómez', email: 'organizador@kindora.com', role: 'organizer', createdAt: new Date() },
+      { id: 'usr_part', name: 'Juan Pérez', email: 'participante@kindora.com', role: 'participante', createdAt: new Date() }
+    ];
+    stats = {
+      usersCount: allUsersList.length,
+      orgsCount: allOrgsList.length,
+      actsCount: allActivitiesList.length,
+    };
+    unverifiedOrgs = allOrgsList.filter((o: any) => o.verificationLevel === 'none');
+  } catch (fallbackErr) {
+    console.error("Fallback error in admin page:", fallbackErr);
+  }
 }
 
 // Handle POST actions: Approve/Reject Verification requests & Moderation
