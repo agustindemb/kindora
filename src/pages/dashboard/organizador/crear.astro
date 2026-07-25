@@ -64,6 +64,9 @@ if (Astro.request.method === 'POST') {
     const externalUrl = formData.get('externalUrl') as string || null;
     const visibility = formData.get('visibility') as string;
     const needsVolunteers = formData.get('needsVolunteers') === 'on' || formData.get('needsVolunteers') === 'true';
+
+    const modality = (formData.get('modality') as string) || 'in_person';
+    const virtualMeetingUrl = (formData.get('virtualMeetingUrl') as string || '').trim() || null;
     
     // Recurrence details
     const isRecurring = formData.get('isRecurring') === 'true' || formData.get('isRecurring') === 'on';
@@ -129,6 +132,8 @@ if (Astro.request.method === 'POST') {
           contactName,
           contactEmail,
           contactPhone,
+          modality,
+          virtualMeetingUrl,
           status: activityToEdit.status, // keep existing status
         },
         {
@@ -168,6 +173,8 @@ if (Astro.request.method === 'POST') {
           contactName,
           contactEmail,
           contactPhone,
+          modality,
+          virtualMeetingUrl,
           status,
         },
         {
@@ -495,17 +502,45 @@ if (Astro.request.method === 'POST') {
         </div>
       </div>
 
-      <!-- STEP 3: UBICACION -->
+      <!-- STEP 3: UBICACION Y MODALIDAD -->
       <div id="step-section-3" class="space-y-5 hidden">
-        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Ubicación del Encuentro</h3>
+        <h3 class="text-lg font-bold text-zinc-900 border-b border-zinc-100 pb-2 mb-4">Ubicación y Modalidad del Encuentro</h3>
 
         <div class="space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Modality Selector -->
+          <div>
+            <label for="act-modality" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+              Modalidad del encuentro <span class="text-rose-500 font-bold ml-0.5">*</span>
+            </label>
+            <select id="act-modality" name="modality" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
+              <option value="in_person" selected={activityToEdit ? activityToEdit.modality === 'in_person' : true}>🏢 Presencial (En lugar físico)</option>
+              <option value="virtual" selected={activityToEdit?.modality === 'virtual'}>💻 Virtual / Online (Por videollamada)</option>
+              <option value="hybrid" selected={activityToEdit?.modality === 'hybrid'}>🔄 Híbrida (Presencial y Virtual)</option>
+            </select>
+          </div>
+
+          <!-- Virtual Meeting Link Input -->
+          <div id="virtual-url-container" class={`p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-2 ${activityToEdit?.modality === 'virtual' || activityToEdit?.modality === 'hybrid' ? '' : 'hidden'}`}>
+            <label for="act-virtual-url" class="block text-xs font-bold text-emerald-800 uppercase tracking-wider">
+              Enlace de la Sala Virtual (Google Meet, Zoom, etc.)
+            </label>
+            <input 
+              type="url" 
+              id="act-virtual-url" 
+              name="virtualMeetingUrl" 
+              value={activityToEdit?.virtualMeetingUrl || ''} 
+              placeholder="https://meet.google.com/abc-defg-hij" 
+              class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" 
+            />
+            <span class="block text-[11px] text-emerald-700 font-medium">Los participantes inscriptos verán el botón para unirse a la sala en el horario publicado.</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="address-fields-container">
             <div class="sm:col-span-2">
               <label for="act-address" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
                 Dirección (Calle y altura) <span class="text-rose-500 font-bold ml-0.5">*</span>
               </label>
-              <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
+              <input type="text" id="act-address" name="address" value={activityToEdit?.location?.address || ''} placeholder="ej: Av. Rivadavia 4500 (o 'Online' si es virtual)" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required />
             </div>
 
             <div>
@@ -870,6 +905,19 @@ if (Astro.request.method === 'POST') {
         recContainer.classList.remove('hidden');
       } else {
         recContainer.classList.add('hidden');
+      }
+    });
+  }
+
+  // Modality toggle listener
+  const modalitySelect = document.getElementById('act-modality') as HTMLSelectElement | null;
+  const virtualContainer = document.getElementById('virtual-url-container');
+  if (modalitySelect && virtualContainer) {
+    modalitySelect.addEventListener('change', () => {
+      if (modalitySelect.value === 'virtual' || modalitySelect.value === 'hybrid') {
+        virtualContainer.classList.remove('hidden');
+      } else {
+        virtualContainer.classList.add('hidden');
       }
     });
   }

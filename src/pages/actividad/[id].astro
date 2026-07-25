@@ -216,11 +216,22 @@ const jsonLd = {
       <!-- Left Column: Details -->
       <div class="lg:col-span-8 space-y-8">
         
-        <!-- Title & Category -->
+        <!-- Title & Category & Modality -->
         <div class="space-y-4">
-          <span class="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-            {activity.category?.name}
-          </span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+              {activity.category?.name}
+            </span>
+            <span class={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${
+              activity.modality === 'virtual' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+              activity.modality === 'hybrid' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+              'bg-zinc-100 text-zinc-700 border border-zinc-200'
+            }`}>
+              {activity.modality === 'virtual' ? '💻 Evento Virtual / Online' :
+               activity.modality === 'hybrid' ? '🔄 Modalidad Híbrida (Presencial y Virtual)' :
+               '🏢 Evento Presencial'}
+            </span>
+          </div>
           <h1 class="text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-4xl leading-tight">
             {activity.title}
           </h1>
@@ -325,6 +336,36 @@ const jsonLd = {
               <p class="text-[11px] text-emerald-700 font-medium mt-1">
                 Podés inscribirte y sumarte a cualquiera de los días u horarios programados.
               </p>
+            </div>
+          </div>
+        )}
+
+        <!-- Virtual Meeting Box if applicable -->
+        {(activity.modality === 'virtual' || activity.modality === 'hybrid') && (
+          <div class="flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-indigo-950 shadow-sm">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm flex-shrink-0 font-bold">
+              💻
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-sm font-bold text-indigo-900">Actividad con Acceso Virtual / Online</h3>
+              <p class="text-xs text-indigo-800 font-medium leading-relaxed">
+                Esta actividad {activity.modality === 'hybrid' ? 'combina encuentro presencial con sala virtual' : 'se realiza de forma remota por videollamada'}.
+              </p>
+              {activity.virtualMeetingUrl ? (
+                <div class="pt-1">
+                  <a 
+                    href={activity.virtualMeetingUrl} 
+                    target="_blank" 
+                    class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all"
+                  >
+                    <span>🔗</span> Unirme a la reunión virtual &rarr;
+                  </a>
+                </div>
+              ) : (
+                <p class="text-[11px] text-indigo-700 font-medium italic">
+                  El organizador compartirá el enlace de la sala virtual con los participantes inscriptos.
+                </p>
+              )}
             </div>
           </div>
         )}

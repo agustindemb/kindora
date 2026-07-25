@@ -13,6 +13,8 @@ export interface SearchFilters {
   isFree?: boolean;
   a11yIds?: string[];
   status?: string;
+  visibility?: string;
+  modality?: string;
 }
 
 const normalizeText = (str: string) =>
@@ -40,6 +42,10 @@ export const searchService = {
       conditions.push(eq(activities.visibility, filters.visibility));
     } else {
       conditions.push(or(eq(activities.visibility, "public"), isNull(activities.visibility))!);
+    }
+
+    if (filters.modality) {
+      conditions.push(eq(activities.modality, filters.modality));
     }
 
     if (filters.categoryId) {

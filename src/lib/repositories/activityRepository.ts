@@ -320,6 +320,8 @@ export const activityRepository = {
         contactName: activityData.contactName || null,
         contactEmail: activityData.contactEmail || null,
         contactPhone: activityData.contactPhone || null,
+        modality: (activityData as any).modality || "in_person",
+        virtualMeetingUrl: (activityData as any).virtualMeetingUrl || null,
         status: activityData.status || "draft",
         createdAt: new Date(),
         deletedAt: null,

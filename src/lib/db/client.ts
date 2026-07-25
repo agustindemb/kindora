@@ -50,6 +50,8 @@ export async function ensureSchemaColumns() {
         ALTER TABLE organizations ADD COLUMN IF NOT EXISTS "volunteerFormSchema" text;
         ALTER TABLE inscriptions ADD COLUMN IF NOT EXISTS "volunteerAnswers" text;
         ALTER TABLE inscriptions ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'registered' NOT NULL;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "modality" text DEFAULT 'in_person' NOT NULL;
+        ALTER TABLE activities ADD COLUMN IF NOT EXISTS "virtualMeetingUrl" text;
         ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "deletedAt" timestamp;
       `);
     } finally {

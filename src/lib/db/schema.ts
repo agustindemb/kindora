@@ -178,6 +178,8 @@ export const activities = pgTable("activities", {
   contactName: text("contactName"),
   contactEmail: text("contactEmail"),
   contactPhone: text("contactPhone"),
+  modality: text("modality").default("in_person").notNull(), // in_person, virtual, hybrid
+  virtualMeetingUrl: text("virtualMeetingUrl"),
   status: text("status").default("draft").notNull(), // draft, pending_review, published, completed, cancelled, archived
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   deletedAt: timestamp("deletedAt"),
