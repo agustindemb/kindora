@@ -127,21 +127,24 @@ try {
   });
 } catch(e) {
   console.warn("DB query error or fallback mock used for admin:", e);
-  const { mockOrganizations, mockActivities } = await import('../../lib/db/mocks');
-  unverifiedOrgs = mockOrganizations.filter(o => o.verificationLevel === 'none');
+  const { organizationRepository } = await import('../../lib/repositories/organizationRepository');
+  const { activityRepository } = await import('../../lib/repositories/activityRepository');
+  const { userRepository } = await import('../../lib/repositories/userRepository');
+
+  const activeOrgs = (await organizationRepository.list()) || [];
+  const activeActs = (await activityRepository.list({})) || [];
+  const activeUsers = (await userRepository.list()) || [];
+
+  unverifiedOrgs = activeOrgs.filter((o: any) => o.verificationLevel === 'none');
   stats = {
-    usersCount: 3,
-    orgsCount: mockOrganizations.length,
-    actsCount: mockActivities.length,
+    usersCount: activeUsers.length,
+    orgsCount: activeOrgs.length,
+    actsCount: activeActs.length,
   };
   
-  allUsersList = [
-    { id: 'usr_admin', name: 'Admin Kindora', email: 'agustin@proasc.com', role: 'admin', createdAt: new Date() },
-    { id: 'usr_org', name: 'María Gómez', email: 'organizador@kindora.com', role: 'organizer', createdAt: new Date() },
-    { id: 'usr_part', name: 'Juan Pérez', email: 'participante@kindora.com', role: 'participant', createdAt: new Date() }
-  ];
-  allOrgsList = mockOrganizations;
-  allActivitiesList = mockActivities.map(a => ({
+  allUsersList = activeUsers;
+  allOrgsList = activeOrgs;
+  allActivitiesList = activeActs.map((a: any) => ({
     id: a.id,
     title: a.title,
     slug: a.slug,
@@ -149,22 +152,12 @@ try {
     startsAt: a.startsAt,
     createdAt: a.createdAt,
     price: a.price,
-    orgName: 'Organización Kindora',
-    orgSlug: 'org-kindora',
-    categoryName: 'General'
+    orgName: a.organization?.name || 'Organización Kindora',
+    orgSlug: a.organization?.slug || 'org-kindora',
+    categoryName: a.category?.name || 'General'
   }));
 
-  pendingVerificationsList = [
-    {
-      id: 'mock-req-1',
-      organizationId: 'org-4',
-      orgName: 'Patitas de Palermo',
-      orgSlug: 'patitas-palermo',
-      userName: 'María Gómez',
-      createdAt: new Date(),
-      details: { dni: '38.234.567', phone: '+5491133334444', notes: 'Personería jurídica en trámite, adjunto estatuto provisorio.' }
-    }
-  ];
+  pendingVerificationsList = [];
 }
 
 // Handle POST actions: Approve/Reject Verification requests & Moderation
@@ -243,9 +236,8 @@ if (Astro.request.method === 'POST') {
 
     } else if (action === 'delete_activity') {
       const actId = formData.get('activityId') as string;
-      await db.update(schema.activities).set({
-        deletedAt: new Date()
-      }).where(eq(schema.activities.id, actId));
+      const { activityRepository } = await import('../../lib/repositories/activityRepository');
+      await activityRepository.softDelete(actId);
 
       successMsg = 'Actividad eliminada correctamente.';
       return Astro.redirect('/admin?tab=activities');
