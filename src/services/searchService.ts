@@ -28,18 +28,18 @@ export const searchService = {
       or(isNull(organizations.deletedAt), isNull(organizations.id))
     ];
 
-    // Standard status filter
+    // Standard status filter (published or null)
     if (filters.status) {
       conditions.push(eq(activities.status, filters.status));
     } else {
-      conditions.push(eq(activities.status, "published"));
+      conditions.push(or(eq(activities.status, "published"), isNull(activities.status))!);
     }
 
-    // Default to public visibility
+    // Default to public visibility (public or null)
     if (filters.visibility) {
       conditions.push(eq(activities.visibility, filters.visibility));
     } else {
-      conditions.push(eq(activities.visibility, "public"));
+      conditions.push(or(eq(activities.visibility, "public"), isNull(activities.visibility))!);
     }
 
     if (filters.categoryId) {

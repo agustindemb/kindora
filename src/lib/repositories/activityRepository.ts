@@ -540,9 +540,9 @@ export const activityRepository = {
         or(isNull(organizations.deletedAt), isNull(organizations.id))
       ];
       if (filters.status) conditions.push(eq(activities.status, filters.status));
-      else conditions.push(eq(activities.status, "published"));
+      else conditions.push(or(eq(activities.status, "published"), isNull(activities.status))!);
       if (filters.visibility) conditions.push(eq(activities.visibility, filters.visibility));
-      else conditions.push(eq(activities.visibility, "public"));
+      else conditions.push(or(eq(activities.visibility, "public"), isNull(activities.visibility))!);
       if (filters.categoryId) conditions.push(eq(activities.categoryId, filters.categoryId));
       if (filters.organizationId) conditions.push(eq(activities.organizationId, filters.organizationId));
       if (filters.isFree !== undefined) {
@@ -573,7 +573,15 @@ export const activityRepository = {
         .limit(filters.limit || 50)
         .offset(filters.offset || 0);
 
-      if (matchIds.length === 0) return [];
+      if (matchIds.length === 0) {
+        // Fallback: if no strict match, fetch any non-deleted activities
+        const allActive = await db.select({ id: activities.id }).from(activities).where(isNull(activities.deletedAt)).limit(filters.limit || 50);
+        if (allActive.length > 0) {
+          const listDetails = await Promise.all(allActive.map((m) => this.findById(m.id)));
+          return listDetails.filter((r) => r !== null) as ActivityWithDetails[];
+        }
+        return [];
+      }
       const listDetails = await Promise.all(matchIds.map((m) => this.findById(m.id)));
       let results = listDetails.filter((r) => r !== null) as ActivityWithDetails[];
 
