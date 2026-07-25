@@ -20,6 +20,8 @@ const {
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://kindora.com.ar');
+const currentUser = Astro.locals.user;
+const isLoggedIn = !!currentUser;
 ---
 
 <!DOCTYPE html>
@@ -99,5 +101,136 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://kindora.
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    {isLoggedIn && (
+      <div>
+        {/* Idle Timeout Warning Modal */}
+        <div id="idle-warning-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm hidden">
+        <div class="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-100 text-center space-y-5">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-2xl font-bold shadow-inner">
+            🔒
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-xl font-extrabold text-zinc-900 tracking-tight">Cierre de sesión por inactividad</h3>
+            <p class="text-sm text-zinc-600 leading-relaxed">
+              No hemos detectado actividad en tu cuenta recientemente. Por razones de seguridad, tu sesión se cerrará automáticamente en:
+            </p>
+            <div class="py-2">
+              <span id="idle-countdown" class="inline-block text-3xl font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-2xl border border-amber-200 font-mono">60</span>
+              <span class="block text-xs font-semibold text-zinc-400 mt-1">segundos</span>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <button
+              type="button"
+              id="idle-extend-btn"
+              class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            >
+              Mantener sesión activa
+            </button>
+            <a
+              href="/auth/logout?reason=idle"
+              class="w-full py-3 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold text-sm transition-all cursor-pointer text-center"
+            >
+              Cerrar sesión ahora
+            </a>
+          </div>
+        </div>
+      </div>
+
+        {/* Idle Auto-Logout Script */}
+        <script>
+          (function() {
+            const IDLE_WARN_MS = 14 * 60 * 1000; // 14 minutes
+            const IDLE_LOGOUT_MS = 15 * 60 * 1000; // 15 minutes
+            const COUNTDOWN_SEC = 60;
+
+            let lastActivity = Date.now();
+            let modalShown = false;
+            let countdownInterval = null;
+
+            const modal = document.getElementById('idle-warning-modal');
+            const countdownEl = document.getElementById('idle-countdown');
+            const extendBtn = document.getElementById('idle-extend-btn');
+
+            function resetActivity() {
+              lastActivity = Date.now();
+              localStorage.setItem('kindora_last_activity', String(lastActivity));
+              if (modalShown) {
+                hideModal();
+              }
+            }
+
+            function hideModal() {
+              modalShown = false;
+              if (modal) modal.classList.add('hidden');
+              if (countdownInterval) clearInterval(countdownInterval);
+            }
+
+            function showModal() {
+              modalShown = true;
+              if (modal) modal.classList.remove('hidden');
+              let remaining = COUNTDOWN_SEC;
+              if (countdownEl) countdownEl.textContent = String(remaining);
+
+              if (countdownInterval) clearInterval(countdownInterval);
+              countdownInterval = setInterval(() => {
+                remaining--;
+                if (countdownEl) countdownEl.textContent = String(Math.max(0, remaining));
+                if (remaining <= 0) {
+                  clearInterval(countdownInterval);
+                  window.location.href = '/auth/logout?reason=idle';
+                }
+              }, 1000);
+            }
+
+            // Listen for user activity
+            const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+            events.forEach((evt) => {
+              window.addEventListener(evt, () => {
+                if (!modalShown) {
+                  resetActivity();
+                }
+              }, { passive: true });
+            });
+
+            // Sync activity across tabs
+            window.addEventListener('storage', (e) => {
+              if (e.key === 'kindora_last_activity' && e.newValue) {
+                lastActivity = parseInt(e.newValue, 10);
+                if (modalShown && (Date.now() - lastActivity < IDLE_WARN_MS)) {
+                  hideModal();
+                }
+              }
+            });
+
+            // Check idle loop every 5 seconds
+            setInterval(() => {
+              const storedLast = parseInt(localStorage.getItem('kindora_last_activity') || '0', 10);
+              if (storedLast > lastActivity) {
+                lastActivity = storedLast;
+              }
+
+              const elapsed = Date.now() - lastActivity;
+
+              if (elapsed >= IDLE_LOGOUT_MS) {
+                window.location.href = '/auth/logout?reason=idle';
+              } else if (elapsed >= IDLE_WARN_MS && !modalShown) {
+                showModal();
+              }
+            }, 5000);
+
+            if (extendBtn) {
+              extendBtn.addEventListener('click', () => {
+                resetActivity();
+              });
+            }
+
+            // Initial timestamp
+            localStorage.setItem('kindora_last_activity', String(Date.now()));
+          })();
+        </script>
+      </div>
+    )}
   </body>
 </html>

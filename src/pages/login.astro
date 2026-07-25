@@ -6,8 +6,13 @@ import { eq } from 'drizzle-orm';
 import { ShieldCheck, Mail, ArrowRight, Star, Building2, Heart } from 'lucide-astro';
 
 const currentRole = Astro.url.searchParams.get('role') || 'participant';
+const reason = Astro.url.searchParams.get('reason');
 let errorMessage = '';
 let successMessage = '';
+
+if (reason === 'idle') {
+  errorMessage = 'Tu sesión se cerró automáticamente por inactividad para proteger tu cuenta.';
+}
 
 // Handle POST request for mock login or Magic Link request
 if (Astro.request.method === 'POST') {
