@@ -351,7 +351,7 @@ const jsonLd = {
               <p class="text-xs text-indigo-800 font-medium leading-relaxed">
                 Esta actividad {activity.modality === 'hybrid' ? 'combina encuentro presencial con sala virtual' : 'se realiza de forma remota por videollamada'}.
               </p>
-              {activity.virtualMeetingUrl ? (
+              {activity.virtualMeetingUrl && activity.registrationType !== 'contact_required' ? (
                 <div class="pt-1">
                   <a 
                     href={activity.virtualMeetingUrl} 
@@ -362,8 +362,8 @@ const jsonLd = {
                   </a>
                 </div>
               ) : (
-                <p class="text-[11px] text-indigo-700 font-medium italic">
-                  El organizador compartirá el enlace de la sala virtual con los participantes inscriptos.
+                <p class="text-[11px] text-indigo-700 font-medium italic mt-1">
+                  🔒 El enlace de la sala virtual es privado y se envía tras confirmar tu asistencia con los organizadores por WhatsApp o Email.
                 </p>
               )}
             </div>
@@ -428,17 +428,45 @@ const jsonLd = {
         <!-- Location Map preview -->
         <div class="space-y-4 pt-6 border-t border-zinc-100">
           <h2 class="text-xl font-bold text-zinc-950">¿Dónde nos encontramos?</h2>
-          <div class="flex items-center gap-2 text-sm text-zinc-600 mb-3">
-            <MapPin class="h-4 w-4 text-emerald-600 flex-shrink-0" />
-            <span>{activity.location?.address || 'Ubicación a confirmar'}, {activity.location?.city || 'Ciudad'}, {activity.location?.province || 'Buenos Aires'}</span>
-          </div>
-          <!-- Single Pin Leaflet Map -->
-          <MapComponent 
-            markers={[{ id: activity.id, title: activity.title, lat: activity.location?.latitude || -34.6037, lng: activity.location?.longitude || -58.3816, address: activity.location?.address || 'Ubicación' }]} 
-            center={[activity.location?.latitude || -34.6037, activity.location?.longitude || -58.3816]} 
-            zoom={14} 
-            heightClass="h-72" 
-          />
+          
+          {activity.registrationType === 'contact_required' ? (
+            <div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 text-amber-950 flex items-start gap-3.5 shadow-sm">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-600 text-white shadow-sm flex-shrink-0 font-bold text-lg">
+                🔒
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-amber-900">Ubicación y punto de encuentro privados</h3>
+                <p class="text-xs text-amber-800 leading-relaxed mt-1">
+                  Por razones de privacidad y coordinación, la dirección exacta y las instrucciones de llegada en {activity.location?.city || 'la ciudad'} no se publican en abierto. Podés solicitarlas a la organización:
+                </p>
+                <div class="pt-3 flex flex-wrap gap-2">
+                  {whatsappUrl && (
+                    <a href={whatsappUrl} target="_blank" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all">
+                      <span>📱</span> Solicitar ubicación por WhatsApp
+                    </a>
+                  )}
+                  {mailtoUrl && (
+                    <a href={mailtoUrl} target="_blank" class="inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all">
+                      <span>✉️</span> Solicitar por Email
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div class="flex items-center gap-2 text-sm text-zinc-600 mb-3">
+                <MapPin class="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <span>{activity.location?.address || 'Ubicación a confirmar'}, {activity.location?.city || 'Ciudad'}, {activity.location?.province || 'Buenos Aires'}</span>
+              </div>
+              <MapComponent 
+                markers={[{ id: activity.id, title: activity.title, lat: activity.location?.latitude || -34.6037, lng: activity.location?.longitude || -58.3816, address: activity.location?.address || 'Ubicación' }]} 
+                center={[activity.location?.latitude || -34.6037, activity.location?.longitude || -58.3816]} 
+                zoom={14} 
+                heightClass="h-72" 
+              />
+            </>
+          )}
         </div>
 
         <!-- Reviews Block -->
