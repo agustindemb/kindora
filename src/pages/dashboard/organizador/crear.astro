@@ -576,9 +576,10 @@ if (Astro.request.method === 'POST') {
           <div>
             <label for="act-reg-type" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Método de Inscripción</label>
             <select id="act-reg-type" name="registrationType" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" required>
-              <option value="open" selected={activityToEdit?.registrationType === 'open'}>Abierta (Inscripción directa)</option>
+              <option value="open" selected={activityToEdit?.registrationType === 'open'}>Abierta (Inscripción directa en Kindora)</option>
               <option value="approval_required" selected={activityToEdit?.registrationType === 'approval_required'}>Requiere aprobación (Revisión manual)</option>
-              <option value="external" selected={activityToEdit?.registrationType === 'external'}>Sitio Externo (Redirección)</option>
+              <option value="contact_required" selected={activityToEdit?.registrationType === 'contact_required'}>Contacto Directo (WhatsApp / Gmail)</option>
+              <option value="external" selected={activityToEdit?.registrationType === 'external'}>Sitio Externo (Redirección a web)</option>
             </select>
           </div>
 
