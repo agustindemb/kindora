@@ -33,11 +33,12 @@ export const GET: APIRoute = async ({ request }) => {
     });
 
     const activeOrgs = await db
-      .select({ id: organizations.id })
-      .from(organizations);
+      .select({ id: organizations.id, slug: organizations.slug })
+      .from(organizations)
+      .where(isNull(organizations.deletedAt));
 
     activeOrgs.forEach((o) => {
-      dynamicPages.push(`/organizacion/${o.id}`);
+      dynamicPages.push(`/organizacion/${o.slug || o.id}`);
     });
   } catch (e) {}
 
