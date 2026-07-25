@@ -535,7 +535,10 @@ export const activityRepository = {
     offset?: number;
   } = {}): Promise<ActivityWithDetails[]> {
     try {
-      const conditions = [isNull(activities.deletedAt), isNull(organizations.deletedAt)];
+      const conditions = [
+        isNull(activities.deletedAt),
+        or(isNull(organizations.deletedAt), isNull(organizations.id))
+      ];
       if (filters.status) conditions.push(eq(activities.status, filters.status));
       else conditions.push(eq(activities.status, "published"));
       if (filters.visibility) conditions.push(eq(activities.visibility, filters.visibility));
@@ -544,7 +547,7 @@ export const activityRepository = {
       if (filters.organizationId) conditions.push(eq(activities.organizationId, filters.organizationId));
       if (filters.isFree !== undefined) {
         if (filters.isFree) conditions.push(eq(activities.price, "0.00"));
-        else conditions.push(sql`${activities.price} > 0`);
+        else conditions.push(sql`${activities.price} != '0.00'`);
       }
       if (filters.dateFrom) conditions.push(gte(activities.startsAt, filters.dateFrom));
       if (filters.dateTo) conditions.push(lte(activities.endsAt, filters.dateTo));
@@ -552,9 +555,9 @@ export const activityRepository = {
       let baseQuery = db
         .select({ id: activities.id })
         .from(activities)
-        .innerJoin(locations, eq(activities.locationId, locations.id))
-        .innerJoin(categories, eq(activities.categoryId, categories.id))
-        .innerJoin(organizations, eq(activities.organizationId, organizations.id));
+        .leftJoin(locations, eq(activities.locationId, locations.id))
+        .leftJoin(categories, eq(activities.categoryId, categories.id))
+        .leftJoin(organizations, eq(activities.organizationId, organizations.id));
 
       if (filters.city) conditions.push(eq(locations.city, filters.city));
       if (filters.tagSlug) {

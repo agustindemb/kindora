@@ -23,7 +23,10 @@ export const searchService = {
     let rawQuery = [filters.query || "", filters.when || ""].join(" ").trim();
     let queryText = normalizeText(rawQuery);
     
-    const conditions = [isNull(activities.deletedAt)];
+    const conditions = [
+      isNull(activities.deletedAt),
+      or(isNull(organizations.deletedAt), isNull(organizations.id))
+    ];
 
     // Standard status filter
     if (filters.status) {
@@ -33,14 +36,18 @@ export const searchService = {
     }
 
     // Default to public visibility
-    conditions.push(eq(activities.visibility, "public"));
+    if (filters.visibility) {
+      conditions.push(eq(activities.visibility, filters.visibility));
+    } else {
+      conditions.push(eq(activities.visibility, "public"));
+    }
 
     if (filters.categoryId) {
       conditions.push(eq(activities.categoryId, filters.categoryId));
     }
 
     if (filters.city) {
-      conditions.push(eq(locations.city, filters.city));
+      conditions.push(ilike(locations.city, `%${filters.city}%`));
     }
 
     let searchIsFree = filters.isFree;
@@ -70,9 +77,9 @@ export const searchService = {
     // Apply resolved isFree filter
     if (searchIsFree !== undefined) {
       if (searchIsFree) {
-        conditions.push(sql`${activities.price}::numeric = 0`);
+        conditions.push(eq(activities.price, "0.00"));
       } else {
-        conditions.push(sql`${activities.price}::numeric > 0`);
+        conditions.push(sql`${activities.price} != '0.00'`);
       }
     }
 
@@ -90,19 +97,19 @@ export const searchService = {
 
     // Apply explicit dates if provided
     if (filters.dateFrom) {
-      conditions.push(sql`${activities.startsAt} >= ${filters.dateFrom}`);
+      conditions.push(gte(activities.startsAt, filters.dateFrom));
     }
     if (filters.dateTo) {
-      conditions.push(sql`${activities.endsAt} <= ${filters.dateTo}`);
+      conditions.push(lte(activities.endsAt, filters.dateTo));
     }
 
     try {
       let baseQuery = db
         .select({ id: activities.id })
         .from(activities)
-        .innerJoin(locations, eq(activities.locationId, locations.id))
-        .innerJoin(categories, eq(activities.categoryId, categories.id))
-        .innerJoin(organizations, eq(activities.organizationId, organizations.id));
+        .leftJoin(locations, eq(activities.locationId, locations.id))
+        .leftJoin(categories, eq(activities.categoryId, categories.id))
+        .leftJoin(organizations, eq(activities.organizationId, organizations.id));
 
       if (queryText) {
         const words = queryText.split(/\s+/).filter(Boolean);
@@ -111,34 +118,35 @@ export const searchService = {
           const normWord = normalizeText(word);
           const pattern = `%${normWord}%`;
           
-          // Accent-insensitive SQL translation
           const textConditions = [
-            sql`translate(lower(${activities.title}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
-            sql`translate(lower(${activities.description}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
-            sql`translate(lower(${locations.city}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
-            sql`translate(lower(${locations.address}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
-            sql`translate(lower(${categories.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
-            sql`translate(lower(${organizations.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`,
+            ilike(activities.title, pattern),
+            ilike(activities.description, pattern),
+            ilike(locations.city, pattern),
+            ilike(locations.address, pattern),
+            ilike(categories.name, pattern),
+            ilike(organizations.name, pattern),
           ];
 
           // Check tags
-          const matchingTags = await db
-            .select({ id: tags.id })
-            .from(tags)
-            .where(sql`translate(lower(${tags.name}), 'áéíóúüñ', 'aeiouun') LIKE ${pattern}`);
-            
-          const tagIds = matchingTags.map(t => t.id);
-          if (tagIds.length > 0) {
-            const actWithTags = await db
-              .select({ activityId: activityTags.activityId })
-              .from(activityTags)
-              .where(inArray(activityTags.tagId, tagIds));
+          try {
+            const matchingTags = await db
+              .select({ id: tags.id })
+              .from(tags)
+              .where(ilike(tags.name, pattern));
               
-            const matchedActIds = actWithTags.map(at => at.activityId);
-            if (matchedActIds.length > 0) {
-              textConditions.push(inArray(activities.id, matchedActIds));
+            const tagIds = matchingTags.map(t => t.id);
+            if (tagIds.length > 0) {
+              const actWithTags = await db
+                .select({ activityId: activityTags.activityId })
+                .from(activityTags)
+                .where(inArray(activityTags.tagId, tagIds));
+                
+              const matchedActIds = actWithTags.map(at => at.activityId);
+              if (matchedActIds.length > 0) {
+                textConditions.push(inArray(activities.id, matchedActIds));
+              }
             }
-          }
+          } catch(e) {}
 
           conditions.push(or(...textConditions)!);
         }
