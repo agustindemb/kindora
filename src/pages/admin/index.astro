@@ -5,7 +5,7 @@ import { analyticsService } from '../../services/analyticsService';
 import { db } from '../../lib/db/client';
 import { organizations, organizationStats, user, organizationLogs } from '../../lib/db/schema';
 import * as schema from '../../lib/db/schema';
-import { eq, and, isNull, sql, desc } from 'drizzle-orm';
+import { eq, and, isNull, sql, desc, inArray } from 'drizzle-orm';
 import { ShieldCheck, CheckCircle2, XCircle, Users, Building2, Calendar, FileText, ExternalLink, Trash2, ArrowUpRight, Search, Shield, UserCheck, Eye, BarChart3, TrendingUp, Activity } from 'lucide-astro';
 
 const currentUser = Astro.locals.user;
@@ -17,8 +17,20 @@ if (!currentUser || (currentUser.role !== 'admin' && currentUser.realRole !== 'a
 // Read active tab from query params
 const activeTabParam = Astro.url.searchParams.get('tab') || 'analytics';
 
-// Fetch analytics metrics
-const analyticsMetrics = await analyticsService.getAdminMetrics();
+// Fetch analytics metrics safely
+let analyticsMetrics = {
+  dau: 0,
+  wau: 0,
+  totalViews: 0,
+  totalJoins: 0,
+  conversionRate: "0.0",
+  recentEvents: [],
+};
+try {
+  analyticsMetrics = await analyticsService.getAdminMetrics();
+} catch (e) {
+  console.warn("Analytics error:", e);
+}
 
 let stats = {
   usersCount: 0,
@@ -33,11 +45,19 @@ let allOrgsList: any[] = [];
 let allActivitiesList: any[] = [];
 
 try {
-  // 0. Auto cleanup existing orphaned activities from soft-deleted organizations
+  // 0. Auto cleanup existing orphaned activities from soft-deleted organizations safely
   try {
-    await db.update(schema.activities)
-      .set({ deletedAt: new Date() })
-      .where(sql`${schema.activities.organizationId} IN (SELECT id FROM organizations WHERE "deletedAt" IS NOT NULL) AND ${schema.activities.deletedAt} IS NULL`);
+    const deletedOrgs = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(sql`${organizations.deletedAt} IS NOT NULL`);
+    
+    if (deletedOrgs.length > 0) {
+      const deletedOrgIds = deletedOrgs.map(o => o.id);
+      await db.update(schema.activities)
+        .set({ deletedAt: new Date() })
+        .where(and(inArray(schema.activities.organizationId, deletedOrgIds), isNull(schema.activities.deletedAt)));
+    }
   } catch (e) {}
 
   // 1. Fetch counts
@@ -94,37 +114,41 @@ try {
     .where(and(eq(organizations.verificationLevel, 'none'), isNull(organizations.deletedAt)));
 
   // 4. Fetch logs of verification requests (only for orgs that are still unverified)
-  const logs = await db
-    .select({
-      log: organizationLogs,
-      org: organizations,
-      u: user
-    })
-    .from(organizationLogs)
-    .innerJoin(organizations, eq(organizationLogs.organizationId, organizations.id))
-    .innerJoin(user, eq(organizationLogs.userId, user.id))
-    .where(
-      and(
-        eq(organizationLogs.action, 'verification_requested'),
-        eq(organizations.verificationLevel, 'none'),
-        isNull(organizations.deletedAt)
+  try {
+    const logs = await db
+      .select({
+        log: organizationLogs,
+        org: organizations,
+        u: user
+      })
+      .from(organizationLogs)
+      .innerJoin(organizations, eq(organizationLogs.organizationId, organizations.id))
+      .innerJoin(user, eq(organizationLogs.userId, user.id))
+      .where(
+        and(
+          eq(organizationLogs.action, 'verification_requested'),
+          eq(organizations.verificationLevel, 'none'),
+          isNull(organizations.deletedAt)
+        )
       )
-    )
-    .orderBy(desc(organizationLogs.createdAt));
+      .orderBy(desc(organizationLogs.createdAt));
 
-  pendingVerificationsList = logs.map(l => {
-    let details = { dni: '', phone: '', notes: '' };
-    try {
-      details = JSON.parse(l.log.details || '{}');
-    } catch(e){}
-    return {
-      ...l.log,
-      orgName: l.org.name,
-      orgSlug: l.org.slug,
-      userName: l.u.name,
-      details
-    };
-  });
+    pendingVerificationsList = logs.map(l => {
+      let details = { dni: '', phone: '', notes: '' };
+      try {
+        details = JSON.parse(l.log.details || '{}');
+      } catch(e){}
+      return {
+        ...l.log,
+        orgName: l.org.name,
+        orgSlug: l.org.slug,
+        userName: l.u.name,
+        details
+      };
+    });
+  } catch (e) {
+    pendingVerificationsList = [];
+  }
 } catch(e) {
   console.warn("DB query error or fallback mock used for admin:", e);
   const { organizationRepository } = await import('../../lib/repositories/organizationRepository');
@@ -679,7 +703,7 @@ if (Astro.request.method === 'POST') {
                 </td>
                 <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
                   <a 
-                    href={`/actividad/${a.slug}`} 
+                    href={`/actividad/${a.id}-${a.slug}`} 
                     target="_blank" 
                     class="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition-all shadow-sm"
                   >
