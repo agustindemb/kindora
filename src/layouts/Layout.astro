@@ -145,9 +145,23 @@ const isLoggedIn = !!currentUser;
             const IDLE_LOGOUT_MS = 15 * 60 * 1000; // 15 minutes
             const COUNTDOWN_SEC = 60;
 
-            let lastActivity = Date.now();
+            const storedLastStr = localStorage.getItem('kindora_last_activity');
+            let lastActivity = storedLastStr ? parseInt(storedLastStr, 10) : Date.now();
+
+            // Check immediately on load/restore if the user has been away longer than 15 minutes
+            if (storedLastStr && (Date.now() - lastActivity >= IDLE_LOGOUT_MS)) {
+              localStorage.removeItem('kindora_last_activity');
+              window.location.href = '/auth/logout?reason=idle';
+              return;
+            }
+
+            // Save initial valid timestamp if not existing
+            if (!storedLastStr) {
+              localStorage.setItem('kindora_last_activity', String(Date.now()));
+            }
+
             let modalShown = false;
-            let countdownInterval = null;
+            let countdownInterval: any = null;
 
             const modal = document.getElementById('idle-warning-modal');
             const countdownEl = document.getElementById('idle-countdown');
@@ -194,6 +208,16 @@ const isLoggedIn = !!currentUser;
               }, { passive: true });
             });
 
+            // Check when tab/window regains focus or computer wakes up
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                const stored = parseInt(localStorage.getItem('kindora_last_activity') || '0', 10);
+                if (stored && (Date.now() - stored >= IDLE_LOGOUT_MS)) {
+                  window.location.href = '/auth/logout?reason=idle';
+                }
+              }
+            });
+
             // Sync activity across tabs
             window.addEventListener('storage', (e) => {
               if (e.key === 'kindora_last_activity' && e.newValue) {
@@ -225,9 +249,6 @@ const isLoggedIn = !!currentUser;
                 resetActivity();
               });
             }
-
-            // Initial timestamp
-            localStorage.setItem('kindora_last_activity', String(Date.now()));
           })();
         </script>
       </div>
