@@ -73,8 +73,13 @@ if (Astro.request.method === 'POST') {
       return Astro.redirect(`/api/auth/magic-link/verify?token=${verificationToken}&callbackURL=${encodeURIComponent(targetDashboard)}`);
 
     } else if (action === 'magic_link') {
-      const emailVal = formData.get('email') as string;
-      if (!emailVal) {
+      const honeypot = (formData.get('website_hp') as string || '').trim();
+      if (honeypot) {
+        console.warn(`[Anti-Bot] Magic link request silently blocked via honeypot`);
+        successMessage = '¡Enlace enviado! Revisá tu correo para iniciar sesión.';
+      } else {
+        const emailVal = (formData.get('email') as string || '').trim();
+        if (!emailVal) {
         errorMessage = 'Por favor ingresá un correo válido.';
       } else {
         const baseUrl = process.env.BETTER_AUTH_URL || Astro.url.origin;
@@ -92,6 +97,7 @@ if (Astro.request.method === 'POST') {
           headers: Astro.request.headers,
         });
         successMessage = '¡Enlace enviado! Revisá tu correo para iniciar sesión.';
+      }
       }
     } else if (action === 'social_login') {
       const provider = formData.get('provider') as string;
@@ -268,6 +274,11 @@ if (Astro.request.method === 'POST') {
         <!-- Magic Link Form -->
         <form method="POST" class="space-y-4">
           <input type="hidden" name="action" value="magic_link" />
+          
+          <!-- Invisible Honeypot Field (Traps automated spam bots) -->
+          <div class="sr-only" aria-hidden="true">
+            <input type="text" name="website_hp" tabindex="-1" autocomplete="off" />
+          </div>
           
           <div>
             <label for="email" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Correo electrónico</label>

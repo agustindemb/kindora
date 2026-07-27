@@ -91,8 +91,14 @@ export const auth = betterAuth({
       },
     },
   },
+  rateLimit: {
+    enabled: true,
+    window: 60, // 60 seconds
+    max: 10, // max 10 auth requests per minute per IP
+  },
   plugins: [
     magicLink({
+      expiresIn: 300, // 5 minutes expiration
       sendMagicLink: async ({ email, url }) => {
         console.log(`\n==================================================`);
         console.log(`📬 [MAGIC LINK SENT]`);
