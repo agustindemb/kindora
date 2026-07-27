@@ -162,8 +162,8 @@ export const activities = pgTable("activities", {
   slug: text("slug").notNull(),
   description: text("description").notNull(),
   locationId: uuid("locationId").notNull().references(() => locations.id),
-  startsAt: timestamp("startsAt").notNull(),
-  endsAt: timestamp("endsAt").notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
   timezone: text("timezone").default("America/Argentina/Buenos_Aires").notNull(),
   capacity: integer("capacity").notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).default("0.00").notNull(), // 0.00 = free
