@@ -80,16 +80,23 @@ if (Astro.request.method === 'POST') {
     const recurrenceDaysArr = formData.getAll('recurrenceDays') as string[];
     const recurrenceDays = recurrenceDaysArr.length > 0 ? JSON.stringify(recurrenceDaysArr) : null;
     
-    let contactName = (formData.get('contactName') as string || '').trim() || null;
-    let contactEmail = (formData.get('contactEmail') as string || '').trim();
-    let contactPhone = (formData.get('contactPhone') as string || '').trim();
+    const hideCoordinator = formData.get('hideCoordinator') === 'true' || formData.get('hideCoordinator') === 'on' || registrationType === 'external';
 
-    // Auto-complete missing contact details with organization's default email and phone if left blank
-    if (!contactEmail && org?.email) {
-      contactEmail = org.email;
-    }
-    if (!contactPhone && (org?.whatsapp || org?.phone)) {
-      contactPhone = org.whatsapp || org.phone || '';
+    let contactName: string | null = (formData.get('contactName') as string || '').trim() || null;
+    let contactEmail: string | null = (formData.get('contactEmail') as string || '').trim() || null;
+    let contactPhone: string | null = (formData.get('contactPhone') as string || '').trim() || null;
+
+    if (hideCoordinator) {
+      contactName = null;
+      contactEmail = null;
+      contactPhone = null;
+    } else {
+      if (!contactEmail && org?.email) {
+        contactEmail = org.email;
+      }
+      if (!contactPhone && (org?.whatsapp || org?.phone)) {
+        contactPhone = org.whatsapp || org.phone || '';
+      }
     }
     
     // Location details
@@ -641,9 +648,22 @@ if (Astro.request.method === 'POST') {
 
         <!-- Coordinator Contact Details -->
         <div class="pt-4 border-t border-zinc-100 space-y-4">
-          <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Coordinador/a directo/a de esta actividad</label>
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Coordinador/a directo/a de esta actividad</label>
+            <label class="inline-flex items-center gap-2 cursor-pointer bg-zinc-50 hover:bg-zinc-100 px-3 py-1.5 rounded-xl border border-zinc-200 transition-all">
+              <input 
+                type="checkbox" 
+                id="hide-coordinator-check" 
+                name="hideCoordinator" 
+                value="true" 
+                checked={activityToEdit ? (!activityToEdit.contactName && !activityToEdit.contactEmail && !activityToEdit.contactPhone) : false}
+                class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4" 
+              />
+              <span class="text-xs text-zinc-700 font-bold">Sin datos de contacto de coordinador (Enlace externo o sin contacto)</span>
+            </label>
+          </div>
           
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div id="coordinator-fields-container" class={`grid grid-cols-1 sm:grid-cols-3 gap-4 ${activityToEdit && (!activityToEdit.contactName && !activityToEdit.contactEmail && !activityToEdit.contactPhone) ? 'hidden' : ''}`}>
             <div>
               <label for="act-contact-name" class="block text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Nombre</label>
               <input type="text" id="act-contact-name" name="contactName" value={activityToEdit?.contactName || ''} placeholder="Nombre completo" class="w-full rounded-xl border border-zinc-200 bg-white p-3 text-sm focus:outline-none focus:border-emerald-600 font-medium" />
@@ -976,6 +996,19 @@ if (Astro.request.method === 'POST') {
   if (tbdCheck) {
     tbdCheck.addEventListener('change', updateTbdState);
     updateTbdState();
+  }
+
+  // Hide coordinator details toggle listener
+  const hideCoordCheck = document.getElementById('hide-coordinator-check') as HTMLInputElement | null;
+  const coordContainer = document.getElementById('coordinator-fields-container');
+  if (hideCoordCheck && coordContainer) {
+    hideCoordCheck.addEventListener('change', () => {
+      if (hideCoordCheck.checked) {
+        coordContainer.classList.add('hidden');
+      } else {
+        coordContainer.classList.remove('hidden');
+      }
+    });
   }
 
   // Modality toggle listener

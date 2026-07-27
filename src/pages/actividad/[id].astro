@@ -399,34 +399,43 @@ const jsonLd = {
         </div>
 
         <!-- Coordinator Contact Details -->
-        <div class="space-y-4 pt-6 border-t border-zinc-100">
-          <h2 class="text-xl font-bold text-zinc-950">Contacto de coordinación</h2>
-          <div class="rounded-2xl border border-zinc-100 p-6 bg-white shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="flex items-center gap-3">
-              <User class="h-5 w-5 text-emerald-600 flex-shrink-0" />
-              <div>
-                <p class="text-[10px] font-bold text-zinc-400 uppercase">Coordinador/a</p>
-                <p class="text-sm font-bold text-zinc-800">{activity.contactName || activity.organization?.contactPerson || 'No especificado'}</p>
+        {(activity.contactName || activity.contactEmail || activity.contactPhone) ? (
+          <div class="space-y-4 pt-6 border-t border-zinc-100">
+            <h2 class="text-xl font-bold text-zinc-950">Contacto de coordinación</h2>
+            <div class="rounded-2xl border border-zinc-100 p-6 bg-white shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="flex items-center gap-3">
+                <User class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p class="text-[10px] font-bold text-zinc-400 uppercase">Coordinador/a</p>
+                  <p class="text-sm font-bold text-zinc-800">{activity.contactName || 'No especificado'}</p>
+                </div>
               </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <Mail class="h-5 w-5 text-emerald-600 flex-shrink-0" />
-              <div>
-                <p class="text-[10px] font-bold text-zinc-400 uppercase">Correo</p>
-                <a href={`mailto:${activity.contactEmail || activity.organization?.email || 'hola@kindora.com.ar'}`} class="text-sm font-semibold text-emerald-600 hover:underline truncate block max-w-[200px]">
-                  {activity.contactEmail || activity.organization?.email || 'No disponible'}
-                </a>
+              <div class="flex items-center gap-3">
+                <Mail class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p class="text-[10px] font-bold text-zinc-400 uppercase">Correo</p>
+                  <a href={`mailto:${activity.contactEmail || 'hola@kindora.com.ar'}`} class="text-sm font-semibold text-emerald-600 hover:underline truncate block max-w-[200px]">
+                    {activity.contactEmail || 'No disponible'}
+                  </a>
+                </div>
               </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <Phone class="h-5 w-5 text-emerald-600 flex-shrink-0" />
-              <div>
-                <p class="text-[10px] font-bold text-zinc-400 uppercase">Teléfono / WhatsApp</p>
-                <p class="text-sm font-semibold text-zinc-800">{activity.contactPhone || activity.organization?.phone || 'No disponible'}</p>
+              <div class="flex items-center gap-3">
+                <Phone class="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p class="text-[10px] font-bold text-zinc-400 uppercase">Teléfono / WhatsApp</p>
+                  <p class="text-sm font-semibold text-zinc-800">{activity.contactPhone || 'No disponible'}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : activity.registrationType === 'external' ? (
+          <div class="space-y-3 pt-6 border-t border-zinc-100">
+            <h2 class="text-xl font-bold text-zinc-950">Contacto e Inscripción</h2>
+            <div class="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-4 text-xs font-medium text-zinc-600 flex items-center gap-2">
+              <span>🌐</span> Esta actividad se gestiona directamente a través del sitio web o formulario externo de la organización.
+            </div>
+          </div>
+        ) : null}
 
         <!-- Location Map preview -->
         <div class="space-y-4 pt-6 border-t border-zinc-100">
