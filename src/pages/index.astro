@@ -267,10 +267,6 @@ const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
           {popularActivities.map((act) => (
             <ActivityCard activity={act} />
           ))}
-          {/* Fallback mock cards if list is small */}
-          {allActivities.slice(0, 4).map((act, i) => i >= popularActivities.length && (
-            <ActivityCard activity={act} />
-          ))}
         </div>
       </div>
 
@@ -285,10 +281,6 @@ const cities = ["Tigre", "Palermo", "Córdoba Capital", "Rosario"];
         </div>
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {newActivities.map((act) => (
-            <ActivityCard activity={act} />
-          ))}
-          {/* Fallback mock cards if list is small */}
-          {allActivities.slice(1, 5).map((act, i) => i >= newActivities.length && (
             <ActivityCard activity={act} />
           ))}
         </div>
