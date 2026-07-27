@@ -93,9 +93,16 @@ if (Astro.request.method === 'POST') {
     }
     
     // Location details
-    const address = formData.get('address') as string;
-    const city = formData.get('city') as string;
-    const province = formData.get('province') as string;
+    let address = (formData.get('address') as string || '').trim();
+    let city = (formData.get('city') as string || '').trim();
+    let province = (formData.get('province') as string || '').trim();
+
+    if (modality === 'virtual') {
+      if (!address) address = 'Evento Virtual / Online';
+      if (!city) city = 'Virtual';
+      if (!province) province = 'Online';
+    }
+
     const latitude = parseFloat(formData.get('latitude') as string) || -34.6037;
     const longitude = parseFloat(formData.get('longitude') as string) || -58.3816;
 
@@ -432,7 +439,9 @@ if (Astro.request.method === 'POST') {
               required={!activityToEdit || !!activityToEdit.startsAt}
             />
           </div>
+        </div>
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <div>
             <label for="act-capacity" class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
               Capacidad máxima (cupos) <span class="text-rose-500 font-bold ml-0.5">*</span>
@@ -972,14 +981,41 @@ if (Astro.request.method === 'POST') {
   // Modality toggle listener
   const modalitySelect = document.getElementById('act-modality') as HTMLSelectElement | null;
   const virtualContainer = document.getElementById('virtual-url-container');
-  if (modalitySelect && virtualContainer) {
-    modalitySelect.addEventListener('change', () => {
-      if (modalitySelect.value === 'virtual' || modalitySelect.value === 'hybrid') {
+  const addressContainer = document.getElementById('address-fields-container');
+  const modAddress = document.getElementById('act-address') as HTMLInputElement | null;
+  const modCity = document.getElementById('act-city') as HTMLInputElement | null;
+  const modProv = document.getElementById('act-prov') as HTMLInputElement | null;
+
+  function updateModalityUI() {
+    if (!modalitySelect) return;
+    const mode = modalitySelect.value;
+    
+    // Virtual meeting URL container
+    if (virtualContainer) {
+      if (mode === 'virtual' || mode === 'hybrid') {
         virtualContainer.classList.remove('hidden');
       } else {
         virtualContainer.classList.add('hidden');
       }
-    });
+    }
+
+    // Physical address container & required constraints
+    if (mode === 'virtual') {
+      if (addressContainer) addressContainer.classList.add('hidden');
+      if (modAddress) modAddress.removeAttribute('required');
+      if (modCity) modCity.removeAttribute('required');
+      if (modProv) modProv.removeAttribute('required');
+    } else {
+      if (addressContainer) addressContainer.classList.remove('hidden');
+      if (modAddress) modAddress.setAttribute('required', 'true');
+      if (modCity) modCity.setAttribute('required', 'true');
+      if (modProv) modProv.setAttribute('required', 'true');
+    }
+  }
+
+  if (modalitySelect) {
+    modalitySelect.addEventListener('change', updateModalityUI);
+    updateModalityUI();
   }
 
   // Validation logic
