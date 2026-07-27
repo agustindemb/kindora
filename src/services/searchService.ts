@@ -175,6 +175,14 @@ export const searchService = {
 
       let results = enrichedResults.filter(Boolean) as ActivityWithDetails[];
 
+      // Deduplicate results by activity ID
+      const seen = new Set<string>();
+      results = results.filter((act) => {
+        if (seen.has(act.id)) return false;
+        seen.add(act.id);
+        return true;
+      });
+
       // Apply accessibility filters
       if (filters.a11yIds && filters.a11yIds.length > 0) {
         results = results.filter((act) =>

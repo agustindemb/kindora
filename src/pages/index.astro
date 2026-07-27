@@ -10,10 +10,13 @@ import { Search, MapPin, Calendar, BookOpen, HeartHandshake, ShieldCheck, Star, 
 const categoriesList = await activityRepository.getCategories();
 const allActivities = await searchService.search();
 
-// Split activities into sections for demo
-const popularActivities = allActivities.slice(0, 2);
-const newActivities = allActivities.slice(2, 4);
-const mapMarkers = allActivities.map((act) => ({
+// Deduplicate activities cleanly by ID
+const uniqueActivities = Array.from(new Map(allActivities.map((a) => [a.id, a])).values());
+
+// Split activities into sections
+const popularActivities = uniqueActivities.slice(0, 3);
+const newActivities = uniqueActivities.slice(3, 9);
+const mapMarkers = uniqueActivities.map((act) => ({
   id: act.id,
   title: act.title,
   lat: act.location.latitude || -34.6037,

@@ -579,19 +579,30 @@ export const activityRepository = {
         .limit(filters.limit || 50)
         .offset(filters.offset || 0);
 
-      if (matchIds.length === 0) {
+      const uniqueMatchIds = Array.from(new Set(matchIds.map((m) => m.id)));
+
+      if (uniqueMatchIds.length === 0) {
         // Fallback ONLY for general searches when no specific filters were requested
         if (!filters.status && !filters.organizationId && !filters.categoryId && !filters.city) {
           const allActive = await db.select({ id: activities.id }).from(activities).where(isNull(activities.deletedAt)).limit(filters.limit || 50);
-          if (allActive.length > 0) {
-            const listDetails = await Promise.all(allActive.map((m) => this.findById(m.id)));
+          const uniqueAllActive = Array.from(new Set(allActive.map((m) => m.id)));
+          if (uniqueAllActive.length > 0) {
+            const listDetails = await Promise.all(uniqueAllActive.map((id) => this.findById(id)));
             return listDetails.filter((r) => r !== null) as ActivityWithDetails[];
           }
         }
         return [];
       }
-      const listDetails = await Promise.all(matchIds.map((m) => this.findById(m.id)));
+      const listDetails = await Promise.all(uniqueMatchIds.map((id) => this.findById(id)));
       let results = listDetails.filter((r) => r !== null) as ActivityWithDetails[];
+
+      // Deduplicate final results safeguard
+      const seen = new Set<string>();
+      results = results.filter((act) => {
+        if (seen.has(act.id)) return false;
+        seen.add(act.id);
+        return true;
+      });
 
       if (filters.a11yIds && filters.a11yIds.length > 0) {
         results = results.filter((act) =>
